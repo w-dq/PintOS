@@ -357,6 +357,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
+  return thread_current()->nice;
   return 0;
 }
 

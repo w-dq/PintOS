@@ -100,6 +100,8 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    
+    int nice;                           /* Niceness. */
   };
 
 /* If false (default), use round-robin scheduler.
