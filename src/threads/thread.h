@@ -98,10 +98,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
+    int64_t blocked_ticks;              /* Thread is blocked for blocked_ticks.*/
+    int nice;                           /* Niceness. */
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    
-    int nice;                           /* Niceness. */
   };
 
 /* If false (default), use round-robin scheduler.

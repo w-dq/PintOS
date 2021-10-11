@@ -134,7 +134,7 @@ intr_init (void)
      Descriptor Table (IDT)". */
   idtr_operand = make_idtr_operand (sizeof idt - 1, idt);
   asm volatile ("lidt %0" : : "m" (idtr_operand));
-
+  
   /* Initialize intr_names. */
   for (i = 0; i < INTR_CNT; i++)
     intr_names[i] = "unknown";

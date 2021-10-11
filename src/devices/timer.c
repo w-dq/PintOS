@@ -92,11 +92,18 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  // while (timer_elapsed (start) < ticks) 
-    // thread_yield ();
 
-  enum intr_level oldLevel = intr_disable (); // interrupt.c ; disable interrupt & keep the old interrupt status
+
+  // while (timer_elapsed (start) < ticks) 
+  //   thread_yield ();
+
   
+  struct thread *cur = thread_current();
+  enum intr_level oldLevel = intr_disable (); 
+  cur->blocked_ticks = ticks;
+  cur->status = THREAD_BLOCKED;
+  intr_set_level(oldLevel);
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -169,12 +176,25 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+static void 
+update_blocked_ticks(struct thread *t, void *aux)
+{
+  if ((t->status == THREAD_BLOCKED)&&(t->blocked_ticks > 0)){
+    t->blocked_ticks--;
+    if (t->blocked_ticks == 0) {
+      thread_unblock(t);
+    } 
+  }
+  
+}
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  thread_foreach(update_blocked_ticks,NULL);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
