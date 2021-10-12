@@ -200,7 +200,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  if (t->priority > thread_current()->priority){
+    thread_yield();
+  }
   return tid;
 }
 
@@ -341,7 +343,17 @@ priority_is_less(const struct list_elem *a,const struct list_elem *b, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread* cur = thread_current();
+  if (cur->priority == new_priority) return;
+  ASSERT(!intr_context());
+  enum intr_level old_level = intr_disable();
+  if (cur != idle_thread){
+    cur->priority = new_priority;
+    list_insert_ordered (&ready_list, &cur->elem, priority_is_less, NULL);
+  }
+  cur->status = THREAD_READY;
+  schedule();
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
