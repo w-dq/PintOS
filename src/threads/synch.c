@@ -31,7 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+#include "kernel/list.h"
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -156,7 +156,26 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+void   //where should the func be put?
+ priority_donate(struct thread *thd){
+  enum intr_level old_level = intr_disable();
+  
+  int cur_max_priority = thd->priority;
+  int lock_max_priority; 
+  if (!list_empty (&t->locks))
+  {
+   list_sort (&t->locks, lock_cmp_priority, NULL);
+   lock_max_priority = list_entry (list_front (&t->locks), struct lock, elem)->max_priority;
+   if (lock_max_priority > cur_max_priority) thd->priority = lock_max_priority;
+  } 
+  //  t->priority = max_priority;
+   
+  if(thd->status == THREAD_READY){
+    list_remove(thd);
+    list_insert_ordered(&ready_list, &(thd->elem),priority_is_less,NULL);
+  }
+  intr_set_level(old_level);
+}
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -196,11 +215,17 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   struct thread *cur = thread_current();
+  struct lock *cur_wait;
   if (lock->holder && !thread_mlfqs){
     cur->waiting_lock = lock;
     /*recursively donate priority*/
-    cur_donate = lock;
-    
+    cur_wait = lock;
+    while(cur_wait->max_priority < cur->priority){
+      cur_wait->max_priority = cur->priority;
+      priority_donate(cur_wait->holder);
+      
+      
+    }
   }
 
   sema_down (&lock->semaphore);
