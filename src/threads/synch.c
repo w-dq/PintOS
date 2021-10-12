@@ -195,6 +195,13 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+  struct thread *cur = thread_current();
+  if (lock->holder && !thread_mlfqs){
+    cur->waiting_lock = lock;
+    /*recursively donate priority*/
+    cur_donate = lock;
+    
+  }
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
