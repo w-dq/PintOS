@@ -104,6 +104,7 @@ struct thread
     struct lock *waiting_lock;         /*thread is waiting for the lock waiting_lock*/
     struct list lock_list;             /*the list of locks the thread holds*/
     int init_priority;                 /*the initial priority of the thread*/ 
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -124,6 +125,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void priority_donate (struct thread *);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
