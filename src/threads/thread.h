@@ -101,9 +101,9 @@ struct thread
     int64_t blocked_ticks;              /* Thread is blocked for blocked_ticks.*/
     int nice;                           /* Niceness. */
    
-    struct lock *waiting_lock;        /*thread is waiting for the lock waiting_lock*/
-    struct list lock_list;           /*the list of locks the thread holds*/
-      
+    struct lock *waiting_lock;         /*thread is waiting for the lock waiting_lock*/
+    struct list lock_list;             /*the list of locks the thread holds*/
+    int init_priority;                 /*the initial priority of the thread*/ 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
