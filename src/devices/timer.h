@@ -3,9 +3,11 @@
 
 #include <round.h>
 #include <stdint.h>
-
+#include "threads/thread.h"
 /* Number of timer interrupts per second. */
 #define TIMER_FREQ 100
+
+void update_priority_current_threads(struct thread *thd);
 
 void timer_init (void);
 void timer_calibrate (void);

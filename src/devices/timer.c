@@ -7,7 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+#include "threads/float_number.h"
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -19,7 +19,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
-
+//int load_avg;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -178,6 +178,51 @@ update_blocked_ticks(struct thread *t, void *aux UNUSED)
     if (t->blocked_ticks == 0) thread_unblock(t);
   }
 }
+void increment_running_thread_recent_cpu(void);
+/* On each timer tick, the running thread's recent_cpu is incremented by 1. */
+void
+increment_running_thread_recent_cpu(){
+  ASSERT (thread_mlfqs);
+  ASSERT (intr_context ());
+  if (thread_current() == idle_thread)
+    return;
+  
+  thread_current() -> recent_cpu = FP_MIX_ADD(thread_current() -> recent_cpu,1);
+}
+
+void
+update_priority_current_threads(struct thread *thd){
+  ASSERT (thread_mlfqs);
+  
+  thd->priority = GET_INT_PART(FP_MIX_SUB (FP_CONVERT(PRI_MAX)-(thd->recent_cpu/4), 2 * thd->nice));
+  if (thd->priority< PRI_MIN) thd->priority = PRI_MIN;
+  else if (thd->priority > PRI_MAX) thd->priority = PRI_MAX;
+}
+
+void update_recent_cpu(struct thread *thd, void *aux UNUSED);
+void
+update_recent_cpu(struct thread *thd, void *aux UNUSED){
+  ASSERT (thread_mlfqs);
+  ASSERT (intr_context ());
+  /*recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice.*/
+  if (thd != idle_thread) {
+    /*recent_cpu is float */
+    thd->recent_cpu = FP_MIX_ADD(FP_MULTIPLY(FP_DIVIDE((2*load_avg),FP_MIX_ADD(2*load_avg,1)),thd->recent_cpu),thd->nice);
+    update_priority_current_threads(thd);
+  }
+}
+
+void update_load_avg(void);
+/*load_avg = (59/60)*load_avg + (1/60)*ready_threads.*/
+void
+update_load_avg(){
+  ASSERT (thread_mlfqs);
+  ASSERT (intr_context());
+  struct thread* cur = thread_current();
+  int num_ready_list = list_size(&ready_list);
+  if (cur!= idle_thread) num_ready_list ++;
+  load_avg = FP_MIX_ADD(FP_MULTIPLY(59,load_avg)/60,FP_MULTIPLY(1,num_ready_list)/60);
+}
 
 /* Timer interrupt handler. */
 static void
@@ -186,6 +231,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   thread_foreach(update_blocked_ticks,NULL);
+  if(thread_mlfqs){
+    increment_running_thread_recent_cpu();
+    if ((ticks % 4) == 0) update_priority_current_threads(thread_current());
+    if ((ticks % TIMER_FREQ) == 0){
+      // update_each_thread_recent_cpu();
+      thread_foreach(update_recent_cpu,NULL);
+      update_load_avg();
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
