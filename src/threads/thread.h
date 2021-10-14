@@ -100,7 +100,7 @@ struct thread
 
     int64_t blocked_ticks;              /* Thread is blocked for blocked_ticks.*/
     int nice;                           /* Niceness. */
-   
+    int recent_cpu;                     /* the number of recent_cpu */
     struct lock *waiting_lock;         /*thread is waiting for the lock waiting_lock*/
     struct list lock_list;             /*the list of locks the thread holds*/
     int init_priority;                 /*the initial priority of the thread*/ 
@@ -113,6 +113,10 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+extern struct thread *idle_thread;
+extern struct list all_list;
+extern struct list ready_list;
+extern int load_avg;
 
 void thread_init (void);
 void thread_start (void);

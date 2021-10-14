@@ -11,6 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/float_number.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -22,14 +24,14 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+struct list ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
-static struct list all_list;
+struct list all_list;
 
 /* Idle thread. */
-static struct thread *idle_thread;
+struct thread *idle_thread;
 
 /* Initial thread, the thread running init.c:main(). */
 static struct thread *initial_thread;
@@ -58,6 +60,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+int load_avg;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -105,6 +108,7 @@ thread_init (void)
 void
 thread_start (void) 
 {
+  load_avg = FP_CONVERT(0);
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -112,7 +116,7 @@ thread_start (void)
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
-
+  
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
@@ -388,6 +392,9 @@ void
 thread_set_nice (int nice UNUSED) 
 {
   /* Not yet implemented. */
+  thread_current()->nice = nice;
+  update_priority_current_threads(thread_current());
+  thread_yield ();
 }
 
 /* Returns the current thread's nice value. */
@@ -396,15 +403,13 @@ thread_get_nice (void)
 {
   /* Not yet implemented. */
   return thread_current()->nice;
-  return 0;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+   return FP_ROUND(load_avg*100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -412,7 +417,7 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return FP_ROUND(100*thread_current()->recent_cpu);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -503,7 +508,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->init_priority = priority; 
   list_init(&(t->lock_list));
   t->waiting_lock = NULL;
-
+  t->nice = 0;
+  t->recent_cpu = FP_CONVERT(0);
   list_push_back (&all_list, &t->allelem);
 }
 
