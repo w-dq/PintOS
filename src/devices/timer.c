@@ -184,10 +184,8 @@ void
 increment_running_thread_recent_cpu(){
   ASSERT (thread_mlfqs);
   ASSERT (intr_context ());
-  if (thread_current() == idle_thread)
-    return;
-  
-  thread_current() -> recent_cpu = FP_MIX_ADD(thread_current() -> recent_cpu,1);
+  if (thread_current() != idle_thread)
+    thread_current() -> recent_cpu = FP_MIX_ADD(thread_current() -> recent_cpu,1);
 }
 
 void
@@ -221,7 +219,7 @@ update_load_avg(){
   struct thread* cur = thread_current();
   int num_ready_list = list_size(&ready_list);
   if (cur!= idle_thread) num_ready_list ++;
-  load_avg = FP_MIX_ADD(FP_MULTIPLY(59,load_avg)/60,FP_MULTIPLY(1,num_ready_list)/60);
+  load_avg = ((load_avg*59)/60) + FP_CONVERT(num_ready_list)/60;
 }
 
 /* Timer interrupt handler. */
@@ -233,12 +231,13 @@ timer_interrupt (struct intr_frame *args UNUSED)
   thread_foreach(update_blocked_ticks,NULL);
   if(thread_mlfqs){
     increment_running_thread_recent_cpu();
-    if ((ticks % 4) == 0) update_priority_current_threads(thread_current());
+
     if ((ticks % TIMER_FREQ) == 0){
-      // update_each_thread_recent_cpu();
-      thread_foreach(update_recent_cpu,NULL);
       update_load_avg();
+      thread_foreach(update_recent_cpu,NULL);
     }
+    if ((ticks % 4) == 0) 
+      update_priority_current_threads(thread_current());
   }
 }
 

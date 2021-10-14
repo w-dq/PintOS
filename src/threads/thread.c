@@ -416,7 +416,6 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
   return FP_ROUND(100*thread_current()->recent_cpu);
 }
 

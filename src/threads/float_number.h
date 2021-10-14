@@ -15,10 +15,10 @@
 #define FP_MULTIPLY(A,B) ((int)(((int64_t) A) * B >> FP_SHIFT_AMOUNT))
 /* DIRECTLY USE: floatA * intB */
 /*floatA / floatB = ((int64_t) x) * f / y */
-#define FP_DIVIDE(A,B) ((int)(((int64_t) A) << FP_SHIFT_AMOUNT) / B)
+#define FP_DIVIDE(A,B) ((int)((((int64_t) A) << FP_SHIFT_AMOUNT) / B))
 /* DIRECTLY USE: floatA / intB */
 /* get the integer part of a float*/
 #define GET_INT_PART(A) (A >> FP_SHIFT_AMOUNT)
 /*floatA -> rounded integer*/
 #define FP_ROUND(A) (A >= 0 ? ((A + (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT) : ((A - (1 << (FP_SHIFT_AMOUNT - 1))) >> FP_SHIFT_AMOUNT)) 
-#endif 
+#endif
