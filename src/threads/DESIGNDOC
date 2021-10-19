@@ -20,6 +20,7 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+Reference to https://www.cnblogs.com/laiy/p/pintos_project1_thread.html
 
                  ALARM CLOCK
                  ===========
@@ -59,7 +60,14 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+'struct thread' member: int init_priority
+Since the priority of a thread might be changed in priority donation or updated somewhere, we save the initial priority in case that priority cannot be set as the new priority value or we want a safe and default priority.
 
+'struct thread' member: struct list lock_list
+keep a list of all locks the thread is holding
+
+'struct thread' member: struct lock *waiting_lock
+keep a pointer to the lock the thread is waiting for
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
