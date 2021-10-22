@@ -31,26 +31,53 @@ Reference to https://www.cnblogs.com/laiy/p/pintos_project1_thread.html
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+'struct thread' member: int64_t blocked_ticks
+it is used to record how many ticks the thread should be blocked.
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+When a thread is asked to sleep for a positive number of ticks, we 
+set the thread member blocked_ticks to that amount and its status to THREAD_BLOCKED.
+The thread does not enter the ready queue and calls the scheduler. For each 
+tick, 'blocked_ticks' of threads that are blocked deduct by one until it reaches 
+zero and unblocked.
+
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+we only check and operate on threads that are blocked and has a positive 'blocked_ticks'.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
+Updating the 'blocked_ticks' takes place in timer_interrupt which would be called 
+on each tick for each thread. So all blocked threads are getting a deduction on 'blocked_ticks'
+each tick. 
+
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+
+we make the part where we change thread status atomic by wrapping it with:
+
+```
+enum intr_level oldLevel = intr_disable (); 
+... 
+intr_set_level(oldLevel);
+```
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+Because threads that are blocked don't go back to the ready queue and 
+therefore won't be scheduled and won't be 'busy waiting'.
 
              PRIORITY SCHEDULING
              ===================
@@ -60,28 +87,57 @@ Reference to https://www.cnblogs.com/laiy/p/pintos_project1_thread.html
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
 'struct thread' member: int init_priority
-Since the priority of a thread might be changed in priority donation or updated somewhere, we save the initial priority in case that priority cannot be set as the new priority value or we want a safe and default priority.
+we save the initial priority in case that priority cannot be set as the new priority value or we want a safe and default priority.
 
 'struct thread' member: struct list lock_list
 keep a list of all locks the thread is holding
 
 'struct thread' member: struct lock *waiting_lock
 keep a pointer to the lock the thread is waiting for
+
+'struct lock' member: int max_priority
+to keep the highest priority among all waiting threads
+
+'struct lock' member: struct list_elem elem
+the element to reference to in the lock_list of thread
+
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+
+
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
 
+They all keep a priority queue of waiting threads, so the first waiter 
+would always be the thread with highest priority.
+
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+First check if the lock aquired is held by any holders, if so the thread 
+waits for the lock. Then recursively, we check if the current lock waiting has a
+max_priority lower priority than the waiting thread, if so the priority is donated
+and update current waiting lock to the lock that the holder is waiting for, 
+until the holder doesn't wait for any lock or has a lower priority than the waiting 
+lock's max_priority.
+
+
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+
+(Our design prevents a higher-priority thread wait for a lock that is
+held by a thead with lower priority, therefore we will assume the question 
+is refering to initial priroty)
+
+The lock holder simply releases the lock from its lock_list, its priority will 
+be reset to the higher one between the highest max_priority of all locks in the 
+lock_list and init_priority.
 
 ---- SYNCHRONIZATION ----
 
@@ -89,10 +145,21 @@ keep a pointer to the lock the thread is waiting for
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+I thread might already changed its priority but haven't yield yet. If the 
+thread is paused here and the scheduler scheduls another thread to perform 
+operations, there may by a race. We made this step atomic to prevent this 
+from happening. A lock cannot avoid this since lock does not prevent interrupts, 
+which is how the timer and scheduler works in our case.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+Each thread hold its own lock_list and allows this task to be done with the 
+minimum amount of data structure. Another design could be using a big global 
+data structure to maintain all the relations between thread and locks which is 
+costly and difficult to implement.
 
               ADVANCED SCHEDULER
               ==================
@@ -102,6 +169,12 @@ keep a pointer to the lock the thread is waiting for
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
+'struct thread' member: int nice
+hold the nice value of this thread
+
+'struct thread' member: int recent_cpu
+hold the value of recent cpu of this thread
 
 ---- ALGORITHMS ----
 
@@ -113,23 +186,31 @@ keep a pointer to the lock the thread is waiting for
 timer  recent_cpu    priority   thread
 ticks   A   B   C   A   B   C   to run
 -----  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+ 0      0   0   0   63  61  59     A
+ 4      4   0   0   62  61  59     A
+ 8      8   0   0   61  61  59     B    ?  
+12      8   4   0   61  60  59     A
+16     12   4   0   60  60  59     B
+20     12   8   0   60  59  59     A
+24     16   8   0   59  59  59     C
+28     16   8   4   59  59  58     B
+32     16  12   4   59  58  58     A
+36     20  12   4   58  58  58     C
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
 
+There are cases where priority are the same. We use the rule of LRU, 
+least recently used(or in this case --- run). Yes this match with the scheduler, 
+we are still running the hioghest priority scheduler just in a more responsive way.
+
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
+
+Calculations and updates took place in the time interrupt rather than in the 
+threads to make the values more accurate. We only update the priority of the 
+current thread every four ticks and all threads every second.
 
 ---- RATIONALE ----
 
@@ -137,6 +218,8 @@ ticks   A   B   C   A   B   C   to run
 >> disadvantages in your design choices.  If you were to have extra
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
+
+
 
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
