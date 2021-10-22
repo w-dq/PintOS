@@ -256,7 +256,6 @@ with the pintos and gdb-debuger.
 >> students, either for future quarters or the remaining projects?
 Perhaps TAs could help us review and analyze the project after the deadline, for example, gives a comparison between different implementation and explain their corresponding consequences.
 >> Any other comments?
-
 1. timer sleep -> if(ticks > 0){ }
 2. while(cur_wait && (cur_wait->max_priority < cur->priority)) and while((cur_wait->max_priority < cur->priority) && cur_wait)
 3. ((int)((((int64_t) A) << FP_SHIFT_AMOUNT) / B)) and ((int)(((int64_t) A) << FP_SHIFT_AMOUNT / B))
