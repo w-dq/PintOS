@@ -156,17 +156,22 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
+Too hard. It usually takes long time to debug using gdb to check out our little wrong points which makes great difference to the execution.
 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+Yes. The implementation about acquiring locks and releasing gives me a clear perspective about 
+the relation between threads and locks, for example, we need consider the max_priority of the lock and current thread's priority when we want to acquire a lock, and in some situations we need to donate priority to certain thread to keep everything going on.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+It's suggested that demanding students to finish some easy pre-project tasks to get farmiliar 
+with the pintos and gdb-debuger.
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
-
+Perhaps TAs could help us review and analyze the project after the deadline, for example, gives a comparison between different implementation and explain their corresponding consequences.
 >> Any other comments?
 
 1. timer sleep -> if(ticks > 0){ }
