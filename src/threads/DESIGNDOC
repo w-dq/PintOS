@@ -219,7 +219,9 @@ current thread every four ticks and all threads every second.
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
 
-
+Our design is relatively simple and efficient and we utilized the provided
+functions very well. If we have more time, we would like to improve the 
+efficiency of all functions related to timer_interrupt, since it is the most frequently called interruption and consumes a lot of time.
 
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
@@ -227,6 +229,9 @@ current thread every four ticks and all threads every second.
 >> abstraction layer for fixed-point math, that is, an abstract data
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
+
+We decied to using havf of the digits to represent the integer part and 
+half to represent the decimal part. This way we can guarantee the accuracy of the decimal part and the range of the integer part. We created a set of marcos because this makes the code more readable and reusable.
 
                SURVEY QUESTIONS
                ================
