@@ -89,7 +89,8 @@ therefore won't be scheduled and won't be 'busy waiting'.
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
 'struct thread' member: int init_priority
-we save the initial priority in case that priority cannot be set as the new priority value or we want a safe and default priority.
+we save the initial priority in case that priority cannot be set as the new 
+priority value or we want a safe and default priority.
 
 'struct thread' member: struct list lock_list
 keep a list of all locks the thread is holding
@@ -107,6 +108,28 @@ the element to reference to in the lock_list of thread
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
 
+Each thread keeps a lcok_list, which contians all the locks it holds, 
+and a waiting lock, each lock holds a max_priority which indicates the 
+highest priority of all threads waiting. 
+When acquiring a lock that is already held by another thread, we perform 
+a recursive check on and priority donation. Each time we check if we are 
+waiting for a lock and if the waiting lock has a lower priority than the 
+current thread's priority. If both condition satisfies, we will need to update 
+the current lock waiting's max_priority and donote the priority to the holder 
+of that lock. We then update the current lock waiting to the waiting_lock of 
+the holder.
+
+```                          acquire B                                   (release B)
+Thread H    |--------------|=====|--------------------------------------|=====|====|
+                           ↑ (donate)                                   |
+                acquire A  |     |                                      | 
+                    |      |     |              (release A)(release B)  |
+Thread M    |=======|----------------------------|===|===========|======|-----------| 
+(holding B)     (donate)   |     |               |
+                    ↓      |     ↓  (release A)
+Thread L    |-------|=(M)==|-----|==(H)==|=======|----------------------------------
+(holding A)                         (back to L)
+```
 
 
 ---- ALGORITHMS ----
@@ -221,7 +244,8 @@ current thread every four ticks and all threads every second.
 
 Our design is relatively simple and efficient and we utilized the provided
 functions very well. If we have more time, we would like to improve the 
-efficiency of all functions related to timer_interrupt, since it is the most frequently called interruption and consumes a lot of time.
+efficiency of all functions related to timer_interrupt, since it is the most 
+frequently called interruption and consumes a lot of time.
 
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
@@ -231,7 +255,9 @@ efficiency of all functions related to timer_interrupt, since it is the most fre
 >> numbers, why did you do so?  If not, why not?
 
 We decied to using havf of the digits to represent the integer part and 
-half to represent the decimal part. This way we can guarantee the accuracy of the decimal part and the range of the integer part. We created a set of marcos because this makes the code more readable and reusable.
+half to represent the decimal part. This way we can guarantee the accuracy of the 
+decimal part and the range of the integer part. We created a set of marcos because 
+this makes the code more readable and reusable.
 
                SURVEY QUESTIONS
                ================
@@ -244,22 +270,32 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
-Too hard. It usually takes long time to debug using gdb to check out our little wrong points which makes great difference to the execution.
+
+Too hard. It usually takes long time to debug using gdb to check out our little 
+wrong points which makes great difference to the execution.
 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
 Yes. The implementation about acquiring locks and releasing gives me a clear perspective about 
-the relation between threads and locks, for example, we need consider the max_priority of the lock and current thread's priority when we want to acquire a lock, and in some situations we need to donate priority to certain thread to keep everything going on.
+the relation between threads and locks, for example, we need consider the max_priority of the 
+lock and current thread's priority when we want to acquire a lock, and in some situations we 
+need to donate priority to certain thread to keep everything going on.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
-It's suggested that demanding students to finish some easy pre-project tasks to get farmiliar 
-with the pintos and gdb-debuger.
+
+It's suggested that demanding students to finish some easy pre-project 
+tasks to get farmiliar with the pintos and gdb-debuger.
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
-Perhaps TAs could help us review and analyze the project after the deadline, for example, gives a comparison between different implementation and explain their corresponding consequences.
+
+Perhaps TAs could help us review and analyze the project after the deadline, 
+for example, gives a comparison between different implementation and explain 
+their corresponding consequences.
+
 >> Any other comments?
 1. timer sleep -> if(ticks > 0){ }
 2. while(cur_wait && (cur_wait->max_priority < cur->priority)) and while((cur_wait->max_priority < cur->priority) && cur_wait)
