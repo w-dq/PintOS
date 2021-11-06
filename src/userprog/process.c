@@ -59,12 +59,42 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  // parse file name strtok_r()
+  char* context = NULL;
+  char* token = strtok_r(file_name, " ", &context);
+
+  success = load (token, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+
+  // add arguments to esp
+  int argc = 0;
+  int argv[128];
+
+  while (token != NULL){
+  // add to esp
+    if_.esp -= (strlen(token) + 1);
+    memcpy(if_.esp, token, strlen(token) + 1);
+    argv[argc] = (int)if_.esp;
+    argc++;
+
+    token = strtok_r(NULL, " ", &context);
+  }
+  // push argv value
+  for(int i = argc - 1; i >= 0; i--){
+    if_.esp -= 4;
+    memcpy(if_.esp, &argv[i], sizeof(int));
+  }
+
+  int argv_head = (int)if_.esp;
+  if_.esp -= 4;
+  memcpy(if_.esp, &argv_head, 4);
+  if_.esp -= 4;
+  memcpy(if_.esp, &argc, 4);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
