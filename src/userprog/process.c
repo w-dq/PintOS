@@ -84,10 +84,22 @@ start_process (void *file_name_)
 
     token = strtok_r(NULL, " ", &context);
   }
+
+  // word alignment
+  int zero = 0;
+  while(((int)(if_.esp)) % 4 != 0){
+    if_.esp--;
+    memcpy(if_.esp,&zero,4);
+  }
+
+  // string end zero
+  if_.esp--;
+  memcpy(if_.esp,&zero,4);
+
   // push argv value
   for(int i = argc - 1; i >= 0; i--){
     if_.esp -= 4;
-    memcpy(if_.esp, &argv[i], sizeof(int));
+    memcpy(if_.esp, &argv[i], 4);
   }
 
   int argv_head = (int)if_.esp;
@@ -96,6 +108,9 @@ start_process (void *file_name_)
   if_.esp -= 4;
   memcpy(if_.esp, &argc, 4);
 
+  // fake return address
+  if_.esp--;
+  memcpy(if_.esp,&zero,4);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
