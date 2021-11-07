@@ -54,6 +54,9 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  char *fn_copy = malloc(strlen(file_name) + 1);
+  strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -74,7 +77,7 @@ start_process (void *file_name_)
   // add arguments to esp
   int argc = 0;
   int argv[128];
-
+  token = strtok_r(fn_copy, " ", &context);
   while (token != NULL){
   // add to esp
     if_.esp -= (strlen(token) + 1);
@@ -148,6 +151,7 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL) 
     {
+      printf("%s: exit(%d)\n", cur->name, cur->ret_status);
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
