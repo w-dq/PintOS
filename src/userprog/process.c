@@ -168,7 +168,7 @@ process_wait (tid_t child_tid)
   }
   else{
     cur->is_wait = true;
-    // sema_down(&(cur->parent->sema_wait));
+    sema_down(&(cur->parent->sema_wait));
     return get_ret_from_child(cur,child_tid);
   }
 }
