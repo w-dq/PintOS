@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -22,6 +23,12 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+
+struct ret_data{
+  int tid;
+  int ret;
+  struct list_elem elem;
+};
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -151,13 +158,8 @@ get_ret_from_child(struct thread* cur, tid_t child_tid){
   return ret;
 }
 
-static struct thread*
-get_thread_by_tid(tid_t tid){
-  
-}
-
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
   struct thread* cur = thread_current();
   struct thread* child = get_thread_by_tid(child_tid); 
@@ -166,8 +168,18 @@ process_wait (tid_t child_tid UNUSED)
   }
   else{
     cur->is_wait = true;
-    sema_down(&(cur->parent->sema_wait));
+    // sema_down(&(cur->parent->sema_wait));
     return get_ret_from_child(cur,child_tid);
+  }
+}
+
+
+void
+record_ret(struct thread* t, int tid, int ret){
+  struct ret_data* rd = (struct ret_data*)malloc(sizeof(struct ret_data));
+  rd->tid = tid;
+  rd->ret = ret;
+  list_push_back(&t->child_ret_list,&rd->elem);
 }
 
 /* Free the current process's resources. */
@@ -183,6 +195,25 @@ process_exit (void) // todo
   if (pd != NULL) 
     {
       printf("%s: exit(%d)\n", cur->name, cur->ret_status);
+
+      while(!list_empty(&cur->open_file_list))
+      {
+        struct file_node * fn = list_entry(list_pop_front(&cur->open_file_list),struct file_node, elem);
+        file_close(fn->f);
+        free(fn);
+      }
+      cur->open_file_num = 0;
+      record_ret(cur->parent,cur->tid, cur->ret_status);
+      cur->save_ret = true;
+      if(cur->parent!=NULL && cur->is_wait){
+        while(!list_empty(&cur->parent->sema_wait.waiters)){
+          sema_up(&cur->parent->sema_wait);
+        }
+      }
+      while(!list_empty(&cur->child_ret_list)){
+        struct ret_data* rd = list_entry(list_pop_front(&cur->child_ret_list),struct ret_data, elem);
+        free(rd);
+      }
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
