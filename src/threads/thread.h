@@ -97,8 +97,18 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
-   int ret_status;                      /* thread return status*/
+    /*for proj2*/
+    int ret_status;                      /* thread return status */
+    int open_file_num;                   /* the number of open files */
+    struct list open_file_list;          /* the list of open files */
+    int max_fd;                          /* max current fd */
+    
+    struct list child_ret_list;          /*the list of child thread's return value*/
+    struct thread* parent;               /* parent thread */
+    struct semaphore sema_wait;          /* semaphore for children wait */
+    bool is_wait;                        /* true if the thread is waited by parent thread */
+    bool save_ret;                       /* true if thread has save return value to parent thread */
+    /*for proj2*/
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

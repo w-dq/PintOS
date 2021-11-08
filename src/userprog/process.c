@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -54,8 +56,8 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  char *fn_copy = malloc(strlen(file_name) + 1);
-  strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+  char *fn_copy = (char*)malloc(strlen(file_name) + 1);
+  if (fn_copy) strlcpy(fn_copy, file_name, strlen(file_name) + 1);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -133,15 +135,44 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+
+static int
+get_ret_from_child(struct thread* cur, tid_t child_tid){
+  int ret=-1;
+  struct list_elem* e;
+  for (e=list_begin(&(cur->child_ret_list)); e!=list_end(&(cur->child_ret_list));e=list_next(e)){
+    struct ret_data* rd = list_entry(e,struct ret_data, elem);
+    if (rd->tid == child_tid){
+      ret = rd->ret;
+      rd->ret = -1;
+      break;
+    }
+  }
+  return ret;
+}
+
+static struct thread*
+get_thread_by_tid(tid_t tid){
+  
+}
+
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  struct thread* cur = thread_current();
+  struct thread* child = get_thread_by_tid(child_tid); 
+  if (child == NULL||child->status == THREAD_DYING||child->save_ret){
+    return get_ret_from_child(cur,child_tid);
+  }
+  else{
+    cur->is_wait = true;
+    sema_down(&(cur->parent->sema_wait));
+    return get_ret_from_child(cur,child_tid);
 }
 
 /* Free the current process's resources. */
 void
-process_exit (void)
+process_exit (void) // todo 
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
