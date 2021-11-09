@@ -11,6 +11,8 @@ struct file_node{
   // int read_dir_cnt;
 };
 
+void exit_ret(int);
+
 void syscall_init (void);
 
 void sys_halt(struct intr_frame *f );
