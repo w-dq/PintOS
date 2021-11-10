@@ -79,10 +79,13 @@ start_process (void *file_name_)
   success = load (token, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
+  if (!success){
+    palloc_free_page (file_name);
+    sema_up(&(thread_current()->sema_wait));
     thread_exit ();
+  }
 
+  sema_up(&(thread_current()->sema_wait));
   // add arguments to esp
   int argc = 0;
   int argv[128];

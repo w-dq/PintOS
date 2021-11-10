@@ -102,7 +102,7 @@ struct thread
     int ret_status;                      /* thread return status */
     int open_file_num;                   /* the number of open files */
     struct list open_file_list;          /* the list of open files */
-    int max_fd;                          /* max current fd */
+    int max_fd;                          /* current max fd */
     
     struct list child_ret_list;          /*the list of child thread's return value*/
     struct thread* parent;               /* parent thread */

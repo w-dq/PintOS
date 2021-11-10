@@ -78,6 +78,7 @@ file_find(struct list *file_list,int fd)
 static void 
 syscall_handler (struct intr_frame *f)
 { 
+  if (!is_user_vaddr(f->esp)) exit_ret(-1);
   int number = *(int*)(f->esp);
   if ((number > SYS_INUMBER) || (number < 0)){
     exit_ret(-1);   
@@ -97,8 +98,18 @@ sys_halt(struct intr_frame *f UNUSED)
 void 
 sys_exit(struct intr_frame *f)
 {
-  exit_ret(*(((int*)f->esp)+1));
+  // if (!is_user_vaddr(((int*)f->esp)+2)) exit_ret(-1);
+  thread_current()->ret_status = *(((int*)f->esp)+1);
+  f->eax = 0;
+  thread_exit();
+  //exit_ret(*(((int*)f->esp)+1));
 }
+// void 
+// exit_ret(int ret_status)
+// {
+//   thread_current()->ret_status = ret_status;
+//   thread_exit();
+// }
 
 void 
 sys_exec(struct intr_frame *f)
@@ -109,7 +120,15 @@ sys_exec(struct intr_frame *f)
     f->eax = -1;
   }
   else{
-    f->eax = process_execute(file_name);
+    char* new_file = (char*)malloc(sizeof(strlen(file_name)+1));
+    memcpy(new_file,file_name,strlen(file_name));
+    tid_t tid = process_execute(new_file);
+    struct thread* thd = get_thread_by_tid(tid);
+    sema_down(&(thd->sema_wait));
+    f->eax = tid;
+    free(new_file);
+    sema_up(&(thd->sema_wait));
+    
   }
   
 }
@@ -129,6 +148,7 @@ sys_wait(struct intr_frame *f)
 void 
 sys_create(struct intr_frame *f)
 {
+  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
   char* file_name = (char*)(((int*)f->esp)+1);
   off_t file_size = *(((int*)f->esp)+2);
   f->eax = filesys_create(file_name,file_size);
@@ -137,6 +157,7 @@ sys_create(struct intr_frame *f)
 void 
 sys_remove(struct intr_frame *f)
 {
+  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
   char* file_name = (char*)(((int*)f->esp)+1);
   f->eax = filesys_remove(file_name);
 }
@@ -144,6 +165,7 @@ sys_remove(struct intr_frame *f)
 void 
 sys_open_file(struct intr_frame *f)
 { 
+  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
   char* file_name = (char*)(((int*)f->esp)+1);
   if (file_name==NULL) {
     f->eax = -1;
@@ -166,7 +188,7 @@ sys_open_file(struct intr_frame *f)
 }
 
 void 
-sys_filesize(struct intr_frame *f)
+sys_filesize(struct intr_frame *f)  ////////////
 {//checked
   int fd = *(((int*)(f->esp))+1);
   struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
@@ -179,7 +201,8 @@ sys_filesize(struct intr_frame *f)
 
 void 
 sys_read(struct intr_frame *f)
-{    
+{   
+  if (!is_user_vaddr(((int*)f->esp)+2)) exit_ret(-1);
   int fd = *(((int*)(f->esp))+1);
   char* buffer = (char*)(*(((int*)(f->esp))+2));
   unsigned size = *(((int*)(f->esp))+3);
@@ -203,6 +226,7 @@ void
 sys_write(struct intr_frame *f)
 { 
   //check user valid address
+  if (!is_user_vaddr(((int*)(f->esp))+2)) exit_ret(-1);
   int fd = *(((int*)(f->esp))+1);
   char* buffer = (char*)(*(((int*)(f->esp))+2));
   unsigned size = *(((int*)(f->esp))+3);
