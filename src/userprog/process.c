@@ -51,6 +51,7 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  thread_current()->child_alive_num++;
   return tid;
 }
 
@@ -81,11 +82,11 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   if (!success){
     palloc_free_page (file_name);
-    sema_up(&(thread_current()->sema_wait));
+    // sema_up(&(thread_current()->parent->sema_wait)); //? parent?
     thread_exit ();
   }
 
-  sema_up(&(thread_current()->sema_wait));
+  
   // add arguments to esp
   int argc = 0;
   int argv[128];
@@ -126,6 +127,9 @@ start_process (void *file_name_)
   // fake return address
   if_.esp--;
   memcpy(if_.esp,&zero,4);
+
+  // sema_up(&(thread_current()->sema_wait)); //? ?
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -166,12 +170,12 @@ process_wait (tid_t child_tid)
 {
   struct thread* cur = thread_current();
   struct thread* child = get_thread_by_tid(child_tid); 
-  if (child == NULL||child->status == THREAD_DYING||child->save_ret){
+  if (child == NULL||child->status == THREAD_DYING||child->save_ret){ //? finished?
     return get_ret_from_child(cur,child_tid);
   }
   else{
     cur->is_wait = true;
-    sema_down(&(cur->parent->sema_wait));
+    sema_down(&(cur->sema_wait)); //? multiple
     return get_ret_from_child(cur,child_tid);
   }
 }
@@ -205,18 +209,22 @@ process_exit (void) // todo
         file_close(fn->f);
         free(fn);
       }
+
       cur->open_file_num = 0;
+
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
-      if(cur->parent!=NULL && cur->is_wait){
-        while(!list_empty(&cur->parent->sema_wait.waiters)){
+
+      cur->parent->child_alive_num--;
+      if(cur->parent!=NULL && cur->parent->is_wait && (cur->parent->child_alive_num == 0)){
           sema_up(&cur->parent->sema_wait);
-        }
       }
+
       while(!list_empty(&cur->child_ret_list)){
         struct ret_data* rd = list_entry(list_pop_front(&cur->child_ret_list),struct ret_data, elem);
         free(rd);
       }
+
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
