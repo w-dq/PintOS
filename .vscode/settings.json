@@ -1,7 +1,8 @@
 {
     "files.associations": {
         "process.h": "c",
-        "malloc.h": "c"
+        "malloc.h": "c",
+        "*.inc": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

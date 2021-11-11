@@ -99,7 +99,7 @@ void
 sys_exit(struct intr_frame *f)
 {
   // if (!is_user_vaddr(((int*)f->esp)+2)) exit_ret(-1);
-  thread_current()->ret_status = *(((int*)f->esp)+1);
+  thread_current()->ret_status = *(int*)(f->esp+4);
   f->eax = 0;
   thread_exit();
   //exit_ret(*(((int*)f->esp)+1));
@@ -115,28 +115,24 @@ void
 sys_exec(struct intr_frame *f)
 {
   //need check valid user address
-  char* file_name = (char*)(((int*)f->esp)+1);
+  char* file_name = (char*)(*(int*)(f->esp+4));
   if (file_name==NULL){
     f->eax = -1;
   }
   else{
     char* new_file = (char*)malloc(sizeof(strlen(file_name)+1));
-    memcpy(new_file,file_name,strlen(file_name));
+    memcpy(new_file,file_name,strlen(file_name)+1);
     tid_t tid = process_execute(new_file);
     struct thread* thd = get_thread_by_tid(tid);
-    sema_down(&(thd->sema_wait));
     f->eax = tid;
     free(new_file);
-    sema_up(&(thd->sema_wait));
-    
   }
-  
 }
 
 void 
 sys_wait(struct intr_frame *f)
 {
-  tid_t pid = (tid_t)*(((int*)f->esp)+1);
+  tid_t pid = *(tid_t*)(f->esp+4);
   if (pid != -1)
   {
     f->eax = process_wait(pid);
@@ -148,26 +144,32 @@ sys_wait(struct intr_frame *f)
 void 
 sys_create(struct intr_frame *f)
 {
-  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
-  char* file_name = (char*)(((int*)f->esp)+1);
-  off_t file_size = *(((int*)f->esp)+2);
-  f->eax = filesys_create(file_name,file_size);
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  
+  char* file_name = (char*)(*(int*)(f->esp+4));
+  off_t file_size = *(off_t*)(f->esp+8);
+  if (file_name == NULL){
+    f->eax = -1;
+    exit_ret(-1);
+  } 
+  bool success = filesys_create(file_name,file_size);
+  f->eax = success;
 }
 
 void 
 sys_remove(struct intr_frame *f)
 {
-  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
-  char* file_name = (char*)(((int*)f->esp)+1);
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  char* file_name = (char*)(*(int*)(f->esp+4));
   f->eax = filesys_remove(file_name);
 }
 
 void 
 sys_open_file(struct intr_frame *f)
 { 
-  if (!is_user_vaddr(((int*)f->esp)+1)) exit_ret(-1);
-  char* file_name = (char*)(((int*)f->esp)+1);
-  if (file_name==NULL) {
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  char* file_name = (char*)(*(int*)(f->esp+4));
+  if (file_name == NULL) {
     f->eax = -1;
     exit_ret(-1);
   }
@@ -176,11 +178,12 @@ sys_open_file(struct intr_frame *f)
     // file node create when open file successfully.
     struct file_node* fn = (struct file_node*)malloc(sizeof(struct file_node));
     fn->f = open_file;
-    thread_current()->max_fd ++;    // next_handle == max_fd
+    thread_current()->max_fd++;    // next_handle == max_fd
     fn->fd =  thread_current()->max_fd;
     
     list_push_back(&(thread_current()->open_file_list),&(fn->elem));
-    thread_current()->open_file_num ++;                                    
+    thread_current()->open_file_num ++;
+    f->eax = fn->fd;                         
   }
   else{
     f->eax = -1;
@@ -190,7 +193,7 @@ sys_open_file(struct intr_frame *f)
 void 
 sys_filesize(struct intr_frame *f)  ////////////
 {//checked
-  int fd = *(((int*)(f->esp))+1);
+  int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
   if (openf){
     f->eax = file_length(openf->f);
@@ -202,10 +205,10 @@ sys_filesize(struct intr_frame *f)  ////////////
 void 
 sys_read(struct intr_frame *f)
 {   
-  if (!is_user_vaddr(((int*)f->esp)+2)) exit_ret(-1);
-  int fd = *(((int*)(f->esp))+1);
-  char* buffer = (char*)(*(((int*)(f->esp))+2));
-  unsigned size = *(((int*)(f->esp))+3);
+  if (!is_user_vaddr(f->esp+8)) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  char* buffer = (char*)(*(int*)(f->esp+8));
+  unsigned size = *(unsigned*)(f->esp+12);
 
   if (fd == 0){
     for(int i = 0;i < (int)size;i++){
@@ -226,10 +229,10 @@ void
 sys_write(struct intr_frame *f)
 { 
   //check user valid address
-  if (!is_user_vaddr(((int*)(f->esp))+2)) exit_ret(-1);
-  int fd = *(((int*)(f->esp))+1);
-  char* buffer = (char*)(*(((int*)(f->esp))+2));
-  unsigned size = *(((int*)(f->esp))+3);
+  if (!is_user_vaddr(f->esp+8)) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  char* buffer = (char*)(*(int*)(f->esp+8));
+  unsigned size = *(unsigned*)(f->esp+12);
   if (fd == 1){
     putbuf(buffer,size);
     f->eax = 0;
@@ -248,8 +251,8 @@ sys_write(struct intr_frame *f)
 void 
 sys_seek(struct intr_frame *f)
 { 
-  int fd = *(((int*)(f->esp))+1);
-  unsigned position = *(((int*)(f->esp))+3);
+  int fd = *(int*)(f->esp+4);
+  unsigned position = *(unsigned*)(f->esp+12);
   struct file_node* openf = file_find(&(thread_current()->open_file_list), fd);
   file_seek(openf->f,position);
 }
@@ -257,7 +260,7 @@ sys_seek(struct intr_frame *f)
 void 
 sys_tell(struct intr_frame *f)
 {
-  int fd = *(((int*)f->esp)+1);
+  int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list), fd);
   if (openf){
     f->eax = file_tell(openf->f);
@@ -270,7 +273,7 @@ sys_tell(struct intr_frame *f)
 void 
 sys_close(struct intr_frame *f)
 {
-  int fd = *(((int*)f->esp)+1);
+  int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list), fd);
   if (openf){
     file_close(openf->f);

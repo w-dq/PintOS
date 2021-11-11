@@ -37,21 +37,27 @@ struct ret_data{
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy, *fn_parsed;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+  fn_parsed = (char*) malloc(strlen(file_name)+1);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  memcpy (fn_parsed, file_name, strlen(file_name)+1);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  char* context = NULL;
+  char* token = strtok_r(fn_parsed, " ", &context);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   thread_current()->child_alive_num++;
+  free(fn_parsed);
   return tid;
 }
 
@@ -82,7 +88,8 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   if (!success){
     palloc_free_page (file_name);
-    // sema_up(&(thread_current()->parent->sema_wait)); //? parent?
+    
+    sema_up(&(thread_current()->parent->sema_wait)); //? parent?
     thread_exit ();
   }
 
@@ -105,11 +112,11 @@ start_process (void *file_name_)
   int zero = 0;
   while(((int)(if_.esp)) % 4 != 0){
     if_.esp--;
-    memcpy(if_.esp,&zero,4);
+    // memcpy(if_.esp,&zero,4);
   }
 
   // string end zero
-  if_.esp--;
+  if_.esp -= 4;
   memcpy(if_.esp,&zero,4);
 
   // push argv value
@@ -125,7 +132,7 @@ start_process (void *file_name_)
   memcpy(if_.esp, &argc, 4);
 
   // fake return address
-  if_.esp--;
+  if_.esp -= 4;
   memcpy(if_.esp,&zero,4);
 
   // sema_up(&(thread_current()->sema_wait)); //? ?
