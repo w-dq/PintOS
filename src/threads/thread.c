@@ -484,7 +484,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&(t->open_file_list));
   list_init(&(t->child_ret_list));
   t->open_file_num = 0;
-  t->max_fd = 0;
+  t->max_fd = 2;
   t->is_wait = false;
   if (t == initial_thread){
     t->parent = NULL;
