@@ -84,6 +84,12 @@ start_process (void *file_name_)
   char* token = strtok_r(file_name, " ", &context);
 
   success = load (token, &if_.eip, &if_.esp);
+  lock_acquire(&file_lock);
+  struct file *openf = filesys_open(token);
+  if(openf != NULL) {
+    file_deny_write(openf);
+  }
+  lock_release(&file_lock);
 
   /* If load failed, quit. */
   if (!success){
