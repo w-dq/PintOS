@@ -98,23 +98,18 @@ sys_halt(struct intr_frame *f UNUSED)
 void 
 sys_exit(struct intr_frame *f)
 {
-  // if (!is_user_vaddr(((int*)f->esp)+2)) exit_ret(-1);
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   thread_current()->ret_status = *(int*)(f->esp+4);
   f->eax = 0;
   thread_exit();
   //exit_ret(*(((int*)f->esp)+1));
 }
-// void 
-// exit_ret(int ret_status)
-// {
-//   thread_current()->ret_status = ret_status;
-//   thread_exit();
-// }
 
 void 
 sys_exec(struct intr_frame *f)
 {
   //need check valid user address
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   char* file_name = (char*)(*(int*)(f->esp+4));
   if (file_name==NULL){
     f->eax = -1;
