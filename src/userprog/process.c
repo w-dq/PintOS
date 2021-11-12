@@ -54,10 +54,14 @@ process_execute (const char *file_name)
   char* token = strtok_r(fn_parsed, " ", &context);
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy); 
+    return TID_ERROR;
+  }
   thread_current()->child_alive_num++;
   free(fn_parsed);
+  sema_down(&thread_current()->load_wait);
+  if(!thread_current()->load_status) return TID_ERROR;
   return tid;
 }
 
@@ -70,8 +74,8 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  char *fn_copy = (char*)malloc(strlen(file_name) + 1);
-  if (fn_copy) strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+  // char *fn_copy = (char*)malloc(strlen(file_name) + 1);
+  // if (fn_copy) strlcpy(fn_copy, file_name, strlen(file_name) + 1);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -85,24 +89,27 @@ start_process (void *file_name_)
 
   success = load (token, &if_.eip, &if_.esp);
   lock_acquire(&file_lock);
-  struct file *openf = filesys_open(token);
-  if(openf != NULL) {
-    file_deny_write(openf);
+  thread_current()->self_elf = filesys_open(token);
+  if(thread_current()->self_elf != NULL) {
+    file_deny_write(thread_current()->self_elf);
   }
   lock_release(&file_lock);
 
+  thread_current()->parent->load_status = success;
+  sema_up(&thread_current()->parent->load_wait);
   /* If load failed, quit. */
   if (!success){
     palloc_free_page (file_name);
     exit_ret(-1);
   }
-
+  
+  
   
   // add arguments to esp
   int argc = 0;
   int argv[128];
-  token = strtok_r(fn_copy, " ", &context);
-  while (token != NULL){
+  // token = strtok_r(fn_copy, " ", &context);
+  do {
   // add to esp
     if_.esp -= (strlen(token) + 1);
     memcpy(if_.esp, token, strlen(token) + 1);
@@ -110,7 +117,7 @@ start_process (void *file_name_)
     argc++;
 
     token = strtok_r(NULL, " ", &context);
-  }
+  } while (token != NULL);
 
   // word alignment
   int zero = 0;
@@ -217,7 +224,9 @@ process_exit (void) // todo
       while(!list_empty(&cur->open_file_list))
       {
         struct file_node * fn = list_entry(list_pop_front(&cur->open_file_list),struct file_node, elem);
+
         file_close(fn->f);
+
         free(fn);
       }
 
@@ -225,6 +234,8 @@ process_exit (void) // todo
 
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
+
+      file_close(cur->self_elf);
 
       cur->parent->child_alive_num--;
       if(cur->parent!=NULL && cur->parent->is_wait && (cur->parent->child_alive_num == 0)){
@@ -235,7 +246,6 @@ process_exit (void) // todo
         struct ret_data* rd = list_entry(list_pop_front(&cur->child_ret_list),struct ret_data, elem);
         free(rd);
       }
-
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the

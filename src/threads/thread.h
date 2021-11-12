@@ -103,11 +103,14 @@ struct thread
     struct list open_file_list;          /* the list of open files */
     int max_fd;                          /* current max fd */
     
+    struct file * self_elf;
     int ret_status;                      /* thread return status */
     int child_alive_num;                 /* number of child still alive */
     struct list child_ret_list;          /*the list of child thread's return value*/
     struct thread* parent;               /* parent thread */
     struct semaphore sema_wait;          /* semaphore for children wait */
+    struct semaphore load_wait;          /* semaphore for sync load success */
+    bool load_status;                    /* true if load success*/
     bool is_wait;                        /* true if the thread is waited by parent thread */
     bool save_ret;                       /* true if thread has save return value to parent thread */
     /*for proj2*/
