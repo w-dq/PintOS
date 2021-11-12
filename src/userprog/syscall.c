@@ -147,16 +147,20 @@ sys_create(struct intr_frame *f)
     f->eax = -1;
     exit_ret(-1);
   } 
+  lock_acquire(&file_lock);
   bool success = filesys_create(file_name,file_size);
   f->eax = success;
+  lock_release(&file_lock);
 }
 
 void 
 sys_remove(struct intr_frame *f)
 {
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  lock_acquire(&file_lock);
   char* file_name = (char*)(*(int*)(f->esp+4));
   f->eax = filesys_remove(file_name);
+  lock_release(&file_lock);
 }
 
 void 
@@ -168,7 +172,9 @@ sys_open_file(struct intr_frame *f)
     f->eax = -1;
     exit_ret(-1);
   }
+  lock_acquire(&file_lock);
   struct file* open_file = filesys_open(file_name); 
+  lock_release(&file_lock);
   if (open_file && (thread_current()->open_file_num < max_files)){
     // file node create when open file successfully.
     struct file_node* fn = (struct file_node*)malloc(sizeof(struct file_node));
@@ -191,7 +197,9 @@ sys_filesize(struct intr_frame *f)  ////////////
   int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
   if (openf){
+    lock_acquire(&file_lock);
     f->eax = file_length(openf->f);
+    lock_acquire(&file_lock);
   } else {
     f->eax = -1;
   }
@@ -213,7 +221,9 @@ sys_read(struct intr_frame *f)
   } else {
     struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
     if (openf){
+      lock_acquire(&file_lock);
       f->eax = file_read(openf->f,buffer,size);
+      lock_acquire(&file_lock);
     } else {
       f->eax = -1;
     }
@@ -239,7 +249,9 @@ sys_write(struct intr_frame *f)
       f->eax = 0;
       return;
     }
+    lock_acquire(&file_lock);
     f->eax = file_write(fn->f,buffer,size); 
+    lock_release(&file_lock);
   }
 }
 
@@ -249,7 +261,9 @@ sys_seek(struct intr_frame *f)
   int fd = *(int*)(f->esp+4);
   unsigned position = *(unsigned*)(f->esp+12);
   struct file_node* openf = file_find(&(thread_current()->open_file_list), fd);
+  lock_acquire(&file_lock);
   file_seek(openf->f,position);
+  lock_release(&file_lock);
 }
 
 void 
@@ -258,7 +272,9 @@ sys_tell(struct intr_frame *f)
   int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list), fd);
   if (openf){
+    lock_acquire(&file_lock);
     f->eax = file_tell(openf->f);
+    lock_release(&file_lock);
   } 
   else {
     f->eax = -1;
@@ -271,7 +287,9 @@ sys_close(struct intr_frame *f)
   int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list), fd);
   if (openf){
+    lock_acquire(&file_lock);
     file_close(openf->f);
+    lock_release(&file_lock);
     list_remove(&(openf->elem));
     free(openf);// used to free struct openf
   } 
