@@ -244,6 +244,9 @@ process_exit (void) // todo
         struct ret_data* rd = list_entry(list_pop_front(&cur->child_ret_list),struct ret_data, elem);
         free(rd);
       }
+
+      file_close(cur->self_elf);
+
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the

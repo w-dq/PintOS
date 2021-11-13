@@ -116,12 +116,8 @@ sys_exec(struct intr_frame *f)
     f->eax = -1;
   }
   else{
-    char* new_file = (char*)malloc(sizeof(strlen(file_name)+1));
-    memcpy(new_file,file_name,strlen(file_name)+1);
-    tid_t tid = process_execute(new_file);
-    struct thread* thd = get_thread_by_tid(tid);
+    tid_t tid = process_execute(file_name);
     f->eax = tid;
-    free(new_file);
   }
 }
 
