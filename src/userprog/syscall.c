@@ -33,8 +33,6 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-
-  // register syscall functions for each syscall
   
   syscalls[SYS_HALT] = sys_halt;
   syscalls[SYS_EXIT] = sys_exit;
@@ -60,7 +58,7 @@ syscall_init (void)
   syscalls[SYS_INUMBER] = sys_inumber;
 }
 
-/* find file_node representing fd. */ //checked
+/* find file_node representing fd. */ 
 struct file_node * 
 file_find(struct list *file_list,int fd)
 {
@@ -84,11 +82,9 @@ syscall_handler (struct intr_frame *f)
     exit_ret(-1);   
   }
   if (syscalls[number]==NULL) exit_ret(-1);
-  // pass on to syscalls
   syscalls[number](f);
 }
 
-// implement syscall functions
 void 
 sys_halt(struct intr_frame *f UNUSED)
 {
@@ -102,13 +98,11 @@ sys_exit(struct intr_frame *f)
   thread_current()->ret_status = *(int*)(f->esp+4);
   f->eax = 0;
   thread_exit();
-  //exit_ret(*(((int*)f->esp)+1));
 }
 
 void 
 sys_exec(struct intr_frame *f)
 {
-  //need check valid user address
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
   char* file_name = (char*)(*(int*)(f->esp+4));
@@ -177,7 +171,7 @@ sys_open_file(struct intr_frame *f)
   struct file* open_file = filesys_open(file_name); 
   lock_release(&file_lock);
   if (open_file && (thread_current()->open_file_num < max_files)){
-    // file node create when open file successfully.
+    /* file node create when open file successfully. */
     struct file_node* fn = (struct file_node*)malloc(sizeof(struct file_node));
     fn->f = open_file;
     thread_current()->max_fd++;    // next_handle == max_fd
@@ -193,8 +187,8 @@ sys_open_file(struct intr_frame *f)
 }
 
 void 
-sys_filesize(struct intr_frame *f)  ////////////
-{//checked
+sys_filesize(struct intr_frame *f)  
+{
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
@@ -236,7 +230,6 @@ sys_read(struct intr_frame *f)
 void 
 sys_write(struct intr_frame *f)
 { 
-  //check user valid address
   if (!is_user_vaddr(f->esp+12)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+8)))) exit_ret(-1);
   int fd = *(int*)(f->esp+4);

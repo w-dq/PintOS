@@ -42,12 +42,10 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  // fn_copy = palloc_get_page (0);
   fn_copy = (char*) malloc(strlen(file_name)+1);
   fn_parsed = (char*) malloc(strlen(file_name)+1);
   if (fn_copy == NULL)
     return TID_ERROR;
-  // strlcpy (fn_copy, file_name, PGSIZE);
   memcpy (fn_copy, file_name, strlen(file_name)+1);
   memcpy (fn_parsed, fn_copy, strlen(file_name)+1);
 
@@ -57,13 +55,11 @@ process_execute (const char *file_name)
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   
   if (tid == TID_ERROR){
-    // palloc_free_page (fn_copy); 
     free(fn_copy);
     return TID_ERROR;
   }
   thread_current()->child_alive_num++;
   sema_down(&thread_current()->load_wait);
-  // free(fn_parsed);
   if(!thread_current()->load_status) return TID_ERROR;
   return tid;
 }
@@ -77,16 +73,12 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  // char *fn_copy = (char*)malloc(strlen(file_name) + 1);
-  // if (fn_copy) strlcpy(fn_copy, file_name, strlen(file_name) + 1);
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  // parse file name strtok_r()
   char* context = NULL;
   char* token = strtok_r(file_name, " ", &context);
 
@@ -102,19 +94,13 @@ start_process (void *file_name_)
   sema_up(&thread_current()->parent->load_wait);
   /* If load failed, quit. */
   if (!success){
-    // palloc_free_page (file_name);
     free(file_name);
     exit_ret(-1);
   }
   
-  
-  
-  // add arguments to esp
   int argc = 0;
   int argv[128];
-  // token = strtok_r(fn_copy, " ", &context);
   do {
-  // add to esp
     if_.esp -= (strlen(token) + 1);
     memcpy(if_.esp, token, strlen(token) + 1);
     argv[argc] = (int)if_.esp;
@@ -123,18 +109,17 @@ start_process (void *file_name_)
     token = strtok_r(NULL, " ", &context);
   } while (token != NULL);
 
-  // word alignment
+  /* word alignment */
   int zero = 0;
   while(((int)(if_.esp)) % 4 != 0){
     if_.esp--;
-    // memcpy(if_.esp,&zero,4);
   }
 
-  // string end zero
+  /* string end zero */
   if_.esp -= 4;
   memcpy(if_.esp,&zero,4);
 
-  // push argv value
+  /* push argv value */
   for(int i = argc - 1; i >= 0; i--){
     if_.esp -= 4;
     memcpy(if_.esp, &argv[i], 4);
@@ -146,7 +131,7 @@ start_process (void *file_name_)
   if_.esp -= 4;
   memcpy(if_.esp, &argc, 4);
 
-  // fake return address
+  /* fake return address */
   if_.esp -= 4;
   memcpy(if_.esp,&zero,4);
 
@@ -211,7 +196,7 @@ record_ret(struct thread* t, int tid, int ret){
 
 /* Free the current process's resources. */
 void
-process_exit (void) // todo 
+process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
@@ -236,8 +221,6 @@ process_exit (void) // todo
 
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
-
-      // file_close(cur->self_elf);
 
       cur->parent->child_alive_num--;
       if(cur->parent!=NULL && cur->parent->is_wait && (cur->parent->child_alive_num == 0)){
