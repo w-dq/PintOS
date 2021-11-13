@@ -42,12 +42,14 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  // fn_copy = palloc_get_page (0);
+  fn_copy = (char*) malloc(strlen(file_name)+1);
   fn_parsed = (char*) malloc(strlen(file_name)+1);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-  memcpy (fn_parsed, file_name, strlen(file_name)+1);
+  // strlcpy (fn_copy, file_name, PGSIZE);
+  memcpy (fn_copy, file_name, strlen(file_name)+1);
+  memcpy (fn_parsed, fn_copy, strlen(file_name)+1);
 
   /* Create a new thread to execute FILE_NAME. */
   char* context = NULL;
@@ -55,12 +57,13 @@ process_execute (const char *file_name)
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   
   if (tid == TID_ERROR){
-    palloc_free_page (fn_copy); 
+    // palloc_free_page (fn_copy); 
+    free(fn_copy);
     return TID_ERROR;
   }
   thread_current()->child_alive_num++;
   sema_down(&thread_current()->load_wait);
-  free(fn_parsed);
+  // free(fn_parsed);
   if(!thread_current()->load_status) return TID_ERROR;
   return tid;
 }
@@ -99,7 +102,8 @@ start_process (void *file_name_)
   sema_up(&thread_current()->parent->load_wait);
   /* If load failed, quit. */
   if (!success){
-    palloc_free_page (file_name);
+    // palloc_free_page (file_name);
+    free(file_name);
     exit_ret(-1);
   }
   
