@@ -38,7 +38,6 @@ static struct thread *initial_thread;
 static struct lock tid_lock;
 
 // /* Lock used by files specifically. */
-// static struct lock file_lock;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 

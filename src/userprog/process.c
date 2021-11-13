@@ -59,8 +59,8 @@ process_execute (const char *file_name)
     return TID_ERROR;
   }
   thread_current()->child_alive_num++;
-  free(fn_parsed);
   sema_down(&thread_current()->load_wait);
+  free(fn_parsed);
   if(!thread_current()->load_status) return TID_ERROR;
   return tid;
 }
@@ -145,8 +145,6 @@ start_process (void *file_name_)
   // fake return address
   if_.esp -= 4;
   memcpy(if_.esp,&zero,4);
-
-  // sema_up(&(thread_current()->sema_wait)); //? ?
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -235,7 +233,7 @@ process_exit (void) // todo
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
 
-      file_close(cur->self_elf);
+      // file_close(cur->self_elf);
 
       cur->parent->child_alive_num--;
       if(cur->parent!=NULL && cur->parent->is_wait && (cur->parent->child_alive_num == 0)){
