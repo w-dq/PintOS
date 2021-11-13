@@ -180,7 +180,7 @@ process_wait (tid_t child_tid)
   }
   else{
     cur->is_wait = true;
-    sema_down(&(cur->sema_wait)); //? multiple
+    sema_down(&(child->sema_wait)); //? multiple
     return get_ret_from_child(cur,child_tid);
   }
 }
@@ -222,9 +222,9 @@ process_exit (void)
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
 
-      cur->parent->child_alive_num--;
-      if(cur->parent!=NULL && cur->parent->is_wait && (cur->parent->child_alive_num == 0)){
-          sema_up(&cur->parent->sema_wait);
+      // cur->parent->child_alive_num--;
+      if(cur->parent!=NULL && cur->parent->is_wait){
+          sema_up(&cur->sema_wait);
       }
 
       while(!list_empty(&cur->child_ret_list)){
