@@ -479,7 +479,6 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->ret_status = 0;
   t->save_ret = false;
-  t->child_alive_num = 0;
   t->self_elf = NULL;
   t->load_status = false;
   sema_init(&t->sema_wait,0);

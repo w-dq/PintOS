@@ -58,7 +58,6 @@ process_execute (const char *file_name)
     free(fn_copy);
     return TID_ERROR;
   }
-  thread_current()->child_alive_num++;
   sema_down(&thread_current()->load_wait);
   if(!thread_current()->load_status) return TID_ERROR;
   return tid;
@@ -222,7 +221,6 @@ process_exit (void)
       record_ret(cur->parent,cur->tid, cur->ret_status);
       cur->save_ret = true;
 
-      // cur->parent->child_alive_num--;
       if(cur->parent!=NULL && cur->parent->is_wait){
           sema_up(&cur->sema_wait);
       }

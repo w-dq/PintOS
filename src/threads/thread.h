@@ -105,7 +105,6 @@ struct thread
     
     struct file * self_elf;
     int ret_status;                      /* thread return status */
-    int child_alive_num;                 /* number of child still alive */
     struct list child_ret_list;          /* the list of child thread's return value */
     struct thread* parent;               /* parent thread */
     struct semaphore sema_wait;          /* semaphore for children wait */
