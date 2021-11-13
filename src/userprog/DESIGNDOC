@@ -103,7 +103,10 @@ Each open file has a file descriptor in the form of integer numbers, and the fil
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
     First, we read the data of fd, buffer pointer, size from stack by moving the esp pointer, which is done for both of reading and writing.
-    Reading data: If fd = 0, then we just read size bytes from keyboard using input_getc() and put these size bytes into buffer, and return the size of bytes we actually read. If fd > 0, we first find the file through file descriptor by file_find() function, and run the syscall function file_read(), and return the read_bytes. If we cannot find the file, return -1.
+    Reading: 
+    If fd = 0, then we just read size bytes from keyboard using input_getc() and put these size bytes into buffer, and return the size of bytes we actually read. If fd > 0, we first find the file through file descriptor by file_find() function, and run the syscall function file_read(), and return the read_bytes. If we cannot find the file, return -1.
+    Writing:
+    If fd = 1, then we just write size bytes from buffer into the console and return the actual written byte size. If fd != 1, if we can find the file by fild_find() function then just return the result of syscall function file_write(),else if we cannot find it, just return 0.
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -174,10 +177,10 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
-
+Since the knowledge about userprogram hasn't been introduced in the lectures, we have a hard time to get farmiliar with the logical process of userprogram in this project. 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
-
+The syscall part gave us clear insight about how user function transformed into kernel function and how data stored in stack is taken into the function parameters.
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?

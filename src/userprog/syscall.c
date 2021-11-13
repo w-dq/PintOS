@@ -248,7 +248,7 @@ sys_write(struct intr_frame *f)
   unsigned size = *(unsigned*)(f->esp+12);
   if (fd == 1){
     putbuf(buffer,size);
-    f->eax = 0;
+    f->eax = size;
   }
   else{
     struct thread* cur = thread_current();
