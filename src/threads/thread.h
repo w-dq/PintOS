@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -97,6 +98,21 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    /*for proj2*/
+    int open_file_num;                   /* the number of open files */
+    struct list open_file_list;          /* the list of open files */
+    int max_fd;                          /* current max fd */
+    
+    struct file * self_elf;
+    int ret_status;                      /* thread return status */
+    struct list child_ret_list;          /* the list of child thread's return value */
+    struct thread* parent;               /* parent thread */
+    struct semaphore sema_wait;          /* semaphore for children wait */
+    struct semaphore load_wait;          /* semaphore for sync load success */
+    bool load_status;                    /* true if load success*/
+    bool is_wait;                        /* true if the thread is waited by parent thread */
+    bool save_ret;                       /* true if thread has save return value to parent thread */
+    /*for proj2*/
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -106,6 +122,7 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+struct lock file_lock;
 
 void thread_init (void);
 void thread_start (void);
@@ -137,5 +154,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+struct thread* get_thread_by_tid(tid_t);
 
 #endif /* threads/thread.h */
