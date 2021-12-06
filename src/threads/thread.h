@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "synch.h"
 
@@ -113,6 +114,9 @@ struct thread
     bool is_wait;                        /* true if the thread is waited by parent thread */
     bool save_ret;                       /* true if thread has save return value to parent thread */
     /*for proj2*/
+
+    struct hash suppl_page_table;        /* supplemental page table, which stores as hash table */
+    /*for proj3*/
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

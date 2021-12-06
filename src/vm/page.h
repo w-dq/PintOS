@@ -51,10 +51,10 @@ bool suppl_pt_less(const struct hash_elem*, const struct hash_elem*, void* UNUSE
 bool insert_suppl_pte(struct hash*, struct suppl_pte*);
 bool suppl_pt_insert_file( struct file*, off_t, uint8_t*, uint32_t, uint32_t, bool);
 bool suppl_pt_insert_mmf (struct file *, off_t, uint8_t *, uint32_t);
-struct supple_pte* get_suppl_pte(struct hash*, void*);
+struct suppl_pte* get_suppl_pte(struct hash*, void*);
 void write_page_back_to_file_wo_lock(struct suppl_pte*);
 void free_suppl_pt(struct hash*);
-bool load_page(struct suppl_pte);
+bool load_page(struct suppl_pte*);
 void grow_stack(void*);
 
 #endif

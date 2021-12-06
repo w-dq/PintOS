@@ -18,6 +18,9 @@ typedef void (*syscall_func)(struct intr_frame * UNUSED);
 syscall_func syscalls[20];
 int max_files = 200;
 
+bool is_valid_ptr (const void *);
+static bool is_valid_uvaddr (const void *);
+
 static void syscall_handler (struct intr_frame *);
 struct file_node * file_find(struct list *,int);
 void exit_ret(int);
@@ -201,6 +204,8 @@ sys_filesize(struct intr_frame *f)
   }
 }
 
+
+
 void 
 sys_read(struct intr_frame *f)
 {   
@@ -210,7 +215,52 @@ sys_read(struct intr_frame *f)
   char* buffer = (char*)(*(int*)(f->esp+8));
   unsigned size = *(unsigned*)(f->esp+12);
 
-  if (fd == 0){
+  struct thread *t = thread_current ();
+
+  unsigned buffer_size = size;
+  void * buffer_tmp = buffer;
+
+  /* check the user memory pointing by buffer are valid */
+  while (buffer_tmp != NULL)
+  {
+    if (!is_valid_uvaddr (buffer_tmp))
+      exit_ret (-1);
+
+    if (pagedir_get_page (t->pagedir, buffer_tmp) == NULL)   
+    { 
+      struct suppl_pte *spte;
+      spte = get_suppl_pte (&t->suppl_page_table, 
+          pg_round_down (buffer_tmp));
+      if (spte != NULL && !spte->is_loaded)
+        load_page (spte);
+            else if (spte == NULL && buffer_tmp >= (f->esp - 32))
+        grow_stack (buffer_tmp);
+      else
+        exit_ret (-1);
+    }
+    
+    /* Advance */
+    if (buffer_size == 0)
+    {
+      /* terminate the checking loop */
+      buffer_tmp = NULL;
+    }
+    else if (buffer_size > PGSIZE)
+    {
+      buffer_tmp += PGSIZE;
+      buffer_size -= PGSIZE;
+    }
+    else
+    {
+      /* last loop */
+      buffer_tmp = buffer + size - 1;
+      buffer_size = 0;
+    }
+  }
+  
+  if (fd == 1){
+    f->eax = -1;
+  } else if (fd == 0){
     for(int i = 0;i < (int)size;i++){
       buffer[i] = input_getc();
     }
@@ -235,6 +285,36 @@ sys_write(struct intr_frame *f)
   int fd = *(int*)(f->esp+4);
   char* buffer = (char*)(*(int*)(f->esp+8));
   unsigned size = *(unsigned*)(f->esp+12);
+
+  unsigned buffer_size = size;
+  void *buffer_tmp = buffer;
+
+  /* check the user memory pointing by buffer are valid */
+  while (buffer_tmp != NULL)
+  {
+    if (!is_valid_ptr (buffer_tmp))
+      exit_ret (-1);
+    
+    /* Advance */ 
+    if (buffer_size > PGSIZE)
+    {
+      buffer_tmp += PGSIZE;
+      buffer_size -= PGSIZE;
+    }
+    else if (buffer_size == 0)
+    {
+      /* terminate the checking loop */
+      buffer_tmp = NULL;
+    }
+    else
+    {
+      /* last loop */
+      buffer_tmp = buffer + size - 1;
+      buffer_size = 0;
+    }
+  }
+
+
   if (fd == 1){
     putbuf(buffer,size);
     f->eax = size;
@@ -317,4 +397,22 @@ void sys_isdir(struct intr_frame *f UNUSED){
 }
 void sys_inumber(struct intr_frame *f UNUSED){
   printf("sys_inumber");
+}
+
+
+bool
+is_valid_ptr (const void *usr_ptr)
+{
+  struct thread *cur = thread_current ();
+  if (is_valid_uvaddr (usr_ptr))
+    {
+      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
+    }
+  return false;
+}
+
+static bool
+is_valid_uvaddr (const void *uvaddr)
+{
+  return (uvaddr != NULL && is_user_vaddr (uvaddr));
 }
