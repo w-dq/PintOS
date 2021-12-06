@@ -1,8 +1,10 @@
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
+#include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #include "lib/kernel/list.h"
 #include "userprog/pagedir.h"
 #include "vm/frame.h"
@@ -11,6 +13,11 @@
 
 static struct lock frame_lock;
 static struct lock eviction_lock;
+static struct frame* get_frame(void*);
+static struct frame* frame_to_evict();
+static bool save_evicted_frame (struct frame* ev_f);
+static void remove_frame_entry(void*);
+static bool append_frame(void*);
 
 void
 frame_init ()
@@ -75,13 +82,15 @@ evict_frame (void){
     lock_release(&eviction_lock);
     return ev_f->frame_adr;
 }
-struct frame *
+
+static struct frame*
 get_frame(void* f){
     struct frame *fm;
     struct list_elem *e;
 
     lock_acquire(&frame_lock);
     e = list_head(&frames);
+    e = list_next(e);
     while(e != list_tail(&frames)){
         fm = list_entry(e,struct frame, elem);
         if (fm->frame_adr == f){
@@ -95,7 +104,7 @@ get_frame(void* f){
 }
 
 /* select a frame to evict */
-struct frame*
+static struct frame*
 frame_to_evict(){
     struct frame *ev_f;
     struct thread *t;
@@ -104,17 +113,78 @@ frame_to_evict(){
     struct frame *class0 = NULL;
     int round_count = 1;
     bool found = false;
+    while(!found){
+        e = list_head(&frames);
+        e = list_next(e);
+        while(e!=list_tail(&frames)){
+            ev_f = list_entry(e, struct frame, elem);
+            t = get_thread_by_tid(ev_f->tid);
+            bool accessed = pagedir_is_accessed(t->pagedir, ev_f->user_vadr);
+            if (!accessed){
+                class0 = ev_f;
+                list_remove(e);
+            }
+            else{
+                pagedir_set_accessed (t->pagedir, ev_f->user_vadr, false);
+            }
+            e = list_next(e);
+        }
+        if (class0 != NULL)
+            found = true;
+        else if (round_count++ == 2)
+            found = true;
+    }
+    return class0;
 
 }
-save_evicted_frame (ev_f){}
+static bool
+save_evicted_frame (struct frame* ev_f){
+    struct thread *t;
+    struct suppl_pte *spte;
+    t = get_thread_by_tid(ev_f->tid);
+    spte = get_suppl_pte (&t->suppl_page_table, ev_f->user_vadr);
+    if (spte == NULL)
+    {
+        spte = calloc(1, sizeof *spte);
+        spte->usr_vadr = ev_f->user_vadr;
+        spte->type = SWAP;
+        if (!insert_suppl_pte (&t->suppl_page_table, spte))
+            return false;
+    }
+    size_t swap_slot_idx;
+    if (pagedir_is_dirty (t->pagedir, spte->usr_vadr)&& (spte->type == MMF))
+    {
+        write_page_back_to_file_wo_lock (spte);
+    }
+    else if (pagedir_is_dirty (t->pagedir, spte->usr_vadr)|| (spte->type != FILE))
+    {
+        swap_slot_idx = vm_swap_out (spte->usr_vadr);
+        if (swap_slot_idx == SWAP_ERROR)
+            return false;
 
-void
+        spte->type = (spte->type | SWAP);
+    }
+
+    memset (ev_f->frame_adr, 0, PGSIZE);
+
+    spte->swap_slot_idx = swap_slot_idx;
+    spte->swap_writable = *(ev_f->pte) & PTE_W;
+
+    spte->is_loaded = false;
+
+    pagedir_clear_page (t->pagedir, spte->usr_vadr);
+
+    return true;
+}
+
+static void
 remove_frame_entry(void* f){
     struct frame *fm;
     struct list_elem *e;
 
     lock_acquire(&frame_lock);
     e = list_head(&frames);
+    e = list_next(e);
     while(e != list_tail(&frames)){
         fm = list_entry(e,struct frame, elem);
         if (fm->frame_adr == f){
@@ -127,7 +197,7 @@ remove_frame_entry(void* f){
     lock_release(&frame_lock);
 }
 
-bool
+static bool
 append_frame(void* f){
     struct frame* fm;
     fm = calloc (1, size(*fm));
