@@ -18,7 +18,7 @@ unsigned
 suppl_pt_hash(const struct hash_elem* he, void* aux UNUSED){
     struct suppl_pte* vspte;
     vspte = hash_entry(he, struct suppl_pte,elem);
-    return hash_bytes(&(vspte->usr_vadr),size(vspte->usr_vadr));
+    return hash_bytes(&(vspte->usr_vadr),sizeof(vspte->usr_vadr));
 }
 
 bool 

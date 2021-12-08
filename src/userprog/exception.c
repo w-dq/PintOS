@@ -154,7 +154,7 @@ page_fault (struct intr_frame *f)
 
 // #ifdef VM
    if (fault_addr == NULL || !not_present || !is_user_vaddr(fault_addr)){
-      exit_ret(-1);
+      exit_ret(-1);////
    }
 
    struct suppl_pte *spte = get_suppl_pte(&thread_current()->suppl_page_table,pg_round_down(fault_addr));

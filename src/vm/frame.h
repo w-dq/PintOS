@@ -2,6 +2,7 @@
 #define VM_FRAME_H
 
 #include "threads/thread.h"
+#include "threads/palloc.h"
 
 struct frame{
     void* frame_adr;            /* physical address */

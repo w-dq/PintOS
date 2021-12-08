@@ -28,8 +28,6 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
-#include "vm/frame.h"
-#include "vm/page.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -41,6 +39,8 @@
 #endif
 #ifdef VM
 #include "vm/swap.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 #endif
 
 /* Page directory with kernel mappings only. */

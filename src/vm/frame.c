@@ -7,9 +7,10 @@
 #include "threads/pte.h"
 #include "lib/kernel/list.h"
 #include "userprog/pagedir.h"
-#include "vm/frame.h"
 #include "vm/page.h"
 #include "vm/swap.h"
+
+#include "vm/frame.h"
 
 static struct lock frame_lock;
 static struct lock eviction_lock;
@@ -31,7 +32,11 @@ frame_init ()
 void* 
 frame_allocate(enum palloc_flags flags){
     void* f = NULL;
-    if (flags == PAL_USER){      ////////
+    if (flags & PAL_USER)
+    {
+      if (flags & PAL_ZERO)
+        f = palloc_get_page (PAL_USER | PAL_ZERO);
+      else
         f = palloc_get_page (PAL_USER);
     }
     /*if allocation successed, append to the frame list*/
@@ -123,6 +128,7 @@ frame_to_evict(){
             if (!accessed){
                 class0 = ev_f;
                 list_remove(e);
+                list_push_back(&frames,e);
             }
             else{
                 pagedir_set_accessed (t->pagedir, ev_f->user_vadr, false);
@@ -200,7 +206,7 @@ remove_frame_entry(void* f){
 static bool
 append_frame(void* f){
     struct frame* fm;
-    fm = calloc (1, size(*fm));
+    fm = calloc (1, sizeof(*fm));
     if (fm == NULL) return false;
     fm->tid = thread_current()->tid;
     fm->frame_adr = f;

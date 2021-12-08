@@ -35,7 +35,7 @@ unsigned mmfile_hash(const struct hash_elem*, void*);
 mapid_t mmfiles_insert (void*, struct file*, int32_t);
 static void free_mmfiles_entry (struct hash_elem*, void*);
 void free_mmfiles (struct hash*);
-static void mmfiles_free_entry (struct mmfile*);
+
 
 struct ret_data{
   int tid;
@@ -51,6 +51,8 @@ struct mmfile
   unsigned pg_cnt; 
   struct hash_elem elem;
 };
+
+static void mmfiles_free_entry (struct mmfile*);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -118,7 +120,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   if (!success){
     free(file_name);
-    exit_ret(-1);
+    exit_ret(-4);
   }
   
   int argc = 0;
@@ -354,7 +356,7 @@ static bool setup_stack (void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
+                          bool writable) UNUSED;
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -653,13 +655,13 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 unsigned
-mmfile_hash(const struct hash_elem *e, void *aux){
+mmfile_hash(const struct hash_elem *e, void *aux UNUSED){
   const struct mmfile *p = hash_entry (e, struct mmfile, elem);
   return hash_bytes (&p->mapid, sizeof p->mapid);
 }
 
 bool 
-mmfile_less(const struct hash_elem *a, const struct hash_elem *b, void *aux){
+mmfile_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED){
   const struct mmfile* fa = hash_entry (a, struct mmfile, elem);
   const struct mmfile* fb = hash_entry (b, struct mmfile, elem);
   return (fa->mapid < fb->mapid);
@@ -671,7 +673,7 @@ mmfiles_insert(void *addr, struct file* file, int32_t len){
   struct mmfile *mmf;
   struct hash_elem* result;
 
-  mmf = calloc (1, size(mmf));
+  mmf = calloc (1, sizeof(mmf));
   if (mmf == NULL) return -1;
   mmf->mapid = cur->mapid_allocator++;
   mmf->file = file;
@@ -766,7 +768,7 @@ free_mmfiles (struct hash *mmfiles)
 }
 
 static void
-free_mmfiles_entry (struct hash_elem *e, void *aux)
+free_mmfiles_entry (struct hash_elem *e, void *aux UNUSED)
 {
   struct mmfile *mmf;
   mmf = hash_entry (e, struct mmfile, elem);
