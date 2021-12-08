@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include "synch.h"
 
+
+typedef int mapid_t;
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -115,6 +118,8 @@ struct thread
     bool save_ret;                       /* true if thread has save return value to parent thread */
     /*for proj2*/
 
+    mapid_t mapid_allocator;             
+    struct hash mmfiles;                 /* memory mapped file table, which stores as hash table */
     struct hash suppl_page_table;        /* supplemental page table, which stores as hash table */
     /*for proj3*/
 

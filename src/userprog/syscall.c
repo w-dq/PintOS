@@ -11,6 +11,8 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "userprog/process.h"
+#include "vm/page.h"
+#include "useprog/pagedir.h"
 
 
 
@@ -229,8 +231,7 @@ sys_read(struct intr_frame *f)
     if (pagedir_get_page (t->pagedir, buffer_tmp) == NULL)   
     { 
       struct suppl_pte *spte;
-      spte = get_suppl_pte (&t->suppl_page_table, 
-          pg_round_down (buffer_tmp));
+      spte = get_suppl_pte (&t->suppl_page_table, pg_round_down (buffer_tmp));
       if (spte != NULL && !spte->is_loaded)
         load_page (spte);
             else if (spte == NULL && buffer_tmp >= (f->esp - 32))
@@ -313,8 +314,6 @@ sys_write(struct intr_frame *f)
       buffer_size = 0;
     }
   }
-
-
   if (fd == 1){
     putbuf(buffer,size);
     f->eax = size;
@@ -375,14 +374,45 @@ sys_close(struct intr_frame *f)
   } 
 }
 
-// the following functions are unused in proj2
-void sys_mmap(struct intr_frame *f UNUSED){
-  printf("sys_mmap");
-}
-void sys_munmap(struct intr_frame *f UNUSED){
-  printf("sys_munmap");
+// for proj3
+/* Map a file into memory. */
+void sys_mmap(struct intr_frame *f){
+  struct thread* cur = thread_current();
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  if ((fd == 0)|(fd == 1)) exit_ret(-1);
+  void* addr = *(int*)(f->esp+8);
+  if ((addr == NULL)|(addr == 0x0)|(pg_ofs (addr) != 0)) exit_ret(-1);
+  struct file_node * openf = file_find(&cur->open_file_list,fd);
+  if (openf == NULL) exit_ret(-1);
+  int file_len = file_length(openf->f);
+  if (file_len <=0) exit_ret(-1);
+  /* check if there is enough space for the file starting from the uvaddr addr*/
+  int offset = 0;
+  while (offset < file_len)
+  {
+    if (get_suppl_pte(&cur->suppl_page_table, addr + offset)) exit_ret(-1);   
+    if (pagedir_get_page (cur->pagedir, addr + offset)) exit_ret(-1); 
+    offset += PGSIZE;
+  }
+  lock_acquire (&file_lock);
+  struct file* newfile = file_reopen(openf->f);
+  lock_release (&file_lock);
+  if (new_file == NULL){
+    exit_ret(-1);
+  }else{
+    f->eax = mmfiles_insert (addr, newfile, len);
+  }
 }
 
+/* Remove a memory mapping. */
+void sys_munmap(struct intr_frame *f UNUSED){
+  if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  mapid_t mapping = *(mapid_t*)(f->esp+4);
+  mmfiles_remove (mapping);
+}
+
+// for proj4
 void sys_chdir(struct intr_frame *f UNUSED){
   printf("sys_chdir");
 }

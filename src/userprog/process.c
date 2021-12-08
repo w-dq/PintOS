@@ -30,11 +30,26 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static bool load_segment_lazily (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
+bool mmfile_less(const struct hash_elem*, const struct hash_elem*, void*);
+unsigned mmfile_hash(const struct hash_elem*, void*);
+mapid_t mmfiles_insert (void*, struct file*, int32_t);
+static void free_mmfiles_entry (struct hash_elem*, void*);
+void free_mmfiles (struct hash*);
+static void mmfiles_free_entry (struct mmfile*);
 
 struct ret_data{
   int tid;
   int ret;
   struct list_elem elem;
+};
+
+struct mmfile
+{
+  mapid_t mapid;
+  struct file* file;
+  void * start_addr;
+  unsigned pg_cnt; 
+  struct hash_elem elem;
 };
 
 /* Starts a new thread running a user program loaded from
@@ -80,7 +95,7 @@ start_process (void *file_name_)
   bool success;
   
   hash_init (&thread_current()->suppl_page_table, suppl_pt_hash, suppl_pt_less, NULL);
-
+  hash_init(&thread_current()->mmfiles, mmfile_hash,mmfile_less,NULL);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -636,4 +651,124 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+unsigned
+mmfile_hash(const struct hash_elem *e, void *aux){
+  const struct mmfile *p = hash_entry (e, struct mmfile, elem);
+  return hash_bytes (&p->mapid, sizeof p->mapid);
+}
+
+bool 
+mmfile_less(const struct hash_elem *a, const struct hash_elem *b, void *aux){
+  const struct mmfile* fa = hash_entry (a, struct mmfile, elem);
+  const struct mmfile* fb = hash_entry (b, struct mmfile, elem);
+  return (fa->mapid < fb->mapid);
+}
+
+mapid_t 
+mmfiles_insert(void *addr, struct file* file, int32_t len){
+  struct thread* cur = thread_current();
+  struct mmfile *mmf;
+  struct hash_elem* result;
+
+  mmf = calloc (1, size(mmf));
+  if (mmf == NULL) return -1;
+  mmf->mapid = cur->mapid_allocator++;
+  mmf->file = file;
+  mmf->start_addr = addr;
+  
+  int offset = 0;
+  int pg_cnt = 0;
+  int tmp_len = len;
+  while (tmp_len > 0)
+    {
+      size_t read_bytes = tmp_len < PGSIZE ? tmp_len : PGSIZE; 
+      if (!suppl_pt_insert_mmf(file, offset, addr, read_bytes)) return -1;
+      offset += PGSIZE;
+      tmp_len -= PGSIZE;
+      addr += PGSIZE;
+      pg_cnt++;
+    }
+
+  mmf->pg_cnt = pg_cnt; 
+  result = hash_insert (&(cur->mmfiles), &mmf->elem);
+  if (result != NULL) return -1;
+  return mmf->mapid; 
+}
+
+void mmfiles_remove (mapid_t mapping){
+  struct thread *cur = thread_current ();
+  struct mmfile mmf;
+  struct mmfile *mmf_ptr;
+  struct hash_elem *he;
+
+  mmf.mapid = mapping;
+  // hash_elem* e = list_head(&cur->mmfiles);
+  // for 
+  he = hash_delete (&cur->mmfiles, &mmf.elem);
+  if (he != NULL)
+    {
+      mmf_ptr = hash_entry (he, struct mmfile, elem);
+      mmfiles_free_entry (mmf_ptr);
+    }
+}
+static void
+mmfiles_free_entry (struct mmfile* mmf_ptr)
+{
+  struct thread *t = thread_current ();
+  struct hash_elem *he;
+  int pg_cnt;
+  struct suppl_pte spte;
+  struct suppl_pte *spte_ptr;
+  int offset;
+
+  pg_cnt = mmf_ptr->pg_cnt;
+  offset = 0;
+  while (pg_cnt-- > 0)
+    {
+      /* Get supplemental page table entry for each page */
+      /* check whether the page is dirty */
+      /* if dirty, write back to the file*/
+      /* free the struct suppl_pte for each entry*/
+      spte.usr_vadr = mmf_ptr->start_addr + offset;
+      he = hash_delete (&t->suppl_page_table, &spte.elem);
+      if (he != NULL)
+	{
+	  spte_ptr = hash_entry (he, struct suppl_pte, elem);
+	  if (spte_ptr->is_loaded
+	      && pagedir_is_dirty (t->pagedir, spte_ptr->usr_vadr))
+	    {
+	      /* write back to disk */
+	      lock_acquire (&file_lock);
+	      file_seek (spte_ptr->data.mmf_page.file, 
+			 spte_ptr->data.mmf_page.ofs);
+	      file_write (spte_ptr->data.mmf_page.file, 
+			  spte_ptr->usr_vadr,
+			  spte_ptr->data.mmf_page.read_bytes);
+	      lock_release (&file_lock);
+	    }
+	  free (spte_ptr);
+	}
+      offset += PGSIZE;
+    }
+
+  lock_acquire (&file_lock);
+  file_close (mmf_ptr->file);
+  lock_release (&file_lock);
+
+  free (mmf_ptr);
+}
+
+void 
+free_mmfiles (struct hash *mmfiles)
+{
+  hash_destroy (mmfiles, free_mmfiles_entry);
+}
+
+static void
+free_mmfiles_entry (struct hash_elem *e, void *aux)
+{
+  struct mmfile *mmf;
+  mmf = hash_entry (e, struct mmfile, elem);
+  mmfiles_free_entry (mmf);
 }

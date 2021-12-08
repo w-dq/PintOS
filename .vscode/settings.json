@@ -1,6 +1,13 @@
 {
     "files.associations": {
         "list.h": "c",
-        "page.h": "c"
+        "page.h": "c",
+        "process.h": "c",
+        "filesys.h": "c",
+        "frame.h": "c",
+        "array": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "utility": "c"
     }
 }

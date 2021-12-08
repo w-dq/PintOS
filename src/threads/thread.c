@@ -483,9 +483,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_status = false;
   sema_init(&t->sema_wait,0);
   sema_init(&t->load_wait,0);
+
+  t->mapid_allocator = 0;
   
   
-  //added by lh
+  
   list_init(&(t->open_file_list));
   list_init(&(t->child_ret_list));
   t->open_file_num = 0;
