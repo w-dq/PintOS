@@ -384,14 +384,26 @@ void sys_mmap(struct intr_frame *f){
 
   struct thread* cur = thread_current();
 
-  if ((addr == NULL)||(addr == 0x0)||(pg_ofs (addr) != 0)) f->eax = -1;
-  if ((fd == 0)|(fd == 1)) f->eax = -1;
+  if ((addr == NULL)||(addr == 0x0)||(pg_ofs (addr) != 0)){
+    f->eax = -1;
+    return;
+  } 
+  if ((fd == 0)|(fd == 1)){
+    f->eax = -1;
+    return;
+  } 
 
   
   struct file_node * openf = file_find(&cur->open_file_list,fd);
-  if (openf == NULL) f->eax = -1;
+  if (openf == NULL){
+    f->eax = -1;
+    return;
+  }
   int file_len = file_length(openf->f);
-  if (file_len <=0) f->eax = -1;
+  if (file_len <=0){
+    f->eax = -1;
+    return;
+  } 
   /* check if there is enough space for the file starting from the uvaddr addr*/
   int offset = 0;
   while (offset < file_len)
