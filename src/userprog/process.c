@@ -120,7 +120,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   if (!success){
     free(file_name);
-    exit_ret(-4);
+    exit_ret(-1);
   }
   
   int argc = 0;
@@ -743,7 +743,7 @@ mmfiles_free_entry (struct mmfile* mmf_ptr)
 	      /* write back to disk */
 	      lock_acquire (&file_lock);
 	      file_seek (spte_ptr->data.mmf_page.file, 
-			 spte_ptr->data.mmf_page.ofs);
+			  spte_ptr->data.mmf_page.ofs);
 	      file_write (spte_ptr->data.mmf_page.file, 
 			  spte_ptr->usr_vadr,
 			  spte_ptr->data.mmf_page.read_bytes);

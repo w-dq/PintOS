@@ -46,6 +46,7 @@ frame_allocate(enum palloc_flags flags){
     else{
         void* evict_f = evict_frame ();
         if (evict_f == NULL) PANIC ("Evicting frame failed");
+        return evict_f;
     } 
     return f;
 }

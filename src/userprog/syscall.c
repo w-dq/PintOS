@@ -384,7 +384,7 @@ void sys_mmap(struct intr_frame *f){
 
   struct thread* cur = thread_current();
 
-  if ((addr == NULL)|(addr == 0x0)|(pg_ofs (addr) != 0)) f->eax = -1;
+  if ((addr == NULL)||(addr == 0x0)||(pg_ofs (addr) != 0)) f->eax = -1;
   if ((fd == 0)|(fd == 1)) f->eax = -1;
 
   
