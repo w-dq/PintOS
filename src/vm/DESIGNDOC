@@ -28,25 +28,68 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+To indicate the type of page in the page table entry
+enum suppl_pte_type
+{
+  SWAP = 001,
+  FILE = 002,
+  MMF  = 004
+};
+
+The struct of supplement page table entry, where the pointer uvaddr denotes the unique user virtual address 
+struct suppl_pte
+{   
+  void *uvaddr;     
+  enum suppl_pte_type type;
+  struct suppl_pte_data data;
+  bool is_loaded;
+
+  size_t swap_slot_idx;
+  bool swap_writable;
+  bool swap_dirty;
+
+  struct hash_elem elem;
+};
+
+Add an attribute in the struct thread. Each thread should has its supplement page table.
+struct hash suppl_page_table;        /* supplemental page table, which stores as hash table */
+
+Support the implementation of file and memory mapped file.
+struct suppl_pte_data
+{
+  struct file * file;
+  off_t ofs;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+  bool writable;
+};
+
 
 ---- ALGORITHMS ----
 
 >> A2: In a few paragraphs, describe your code for accessing the data
 >> stored in the SPT about a given page.
+We can get the supplement page table entry in the SPT using the user virtual address by function get_suppl_pte().If the supplement page table entry is not null and it is not loaded yet, load the page by function load_page(). According to the page type, do corresponding page loading. If the type is file, we use function load_page_file() to load the page. If the type is mmf, use function load_page_mmf() to load the page. Else if the type is swap, use function load_page_swap().
+
+
 
 >> A3: How does your code coordinate accessed and dirty bits between
 >> kernel and user virtual addresses that alias a single frame, or
 >> alternatively how do you avoid the issue?
+we only exploit user virtual address to access user data to avoid the issue.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: When two user processes both need a new frame at the same time,
 >> how are races avoided?
 
+The function frame_allocate(enum palloc_flags flags) is to implement frame allocation. In this function, we mainly use palloc_get_page() function to realize the page allocation. The lock in palloc_get_page() assured that only one process does bitmap_scan_and_flip to get a free page index at a certain time. And when we push the new allocated frame into the frame tables, there is another lock in append_frame() to guarantee only one process can push its new frame into the frame table at one time.
+
 ---- RATIONALE ----
 
 >> A5: Why did you choose the data structure(s) that you did for
 >> representing virtual-to-physical mappings?
+To achieve the swapping and lazily page loading, it's more powerful to choose supplement page table. The most difference is that, the original page table do the mapping between virtual address and the physical frame, while the supplement page table try to map virtual address into the address in the disk. So that we can find the unloaded pages, such as pages haven't been loaded from files and the pages haven't been swapped out, from the supplement page table.
 
                PAGING TO AND FROM DISK
                =======================
@@ -57,18 +100,37 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+A list of frames, a global structure, represents the frame table.
+struct list frames;
+
+struct frame is used to represent the frame table entry actually.
+struct frame{
+    void* frame_adr;            /* physical address */
+    void* user_vadr;            /* user virtual address */
+    uint32_t* pte;              /* page table entry pointer */
+    tid_t tid;                  /* thread id */
+    struct list_elem elem;      /* list elem to indicate in list */
+    bool evictable;
+};
+
 ---- ALGORITHMS ----
 
 >> B2: When a frame is required but none is free, some frame must be
 >> evicted.  Describe your code for choosing a frame to evict.
+We mainly implement the clock_algorithm to choose the evicted frame.
+when traversing the list of frames, the clock pointer pointed to the a frame is advanced in each iteration. If meet certain frame is not accessed in this pagedirctory, the iteration ends and the targeted frame is chosen to evicted. Or if we have traversed all frames, the chosen frame is the list tail of frames.
 
 >> B3: When a process P obtains a frame that was previously used by a
 >> process Q, how do you adjust the page table (and any other data
 >> structures) to reflect the frame Q no longer has?
 
+The "tid" attribute of the frame tells us the process/thread it's held. Thus we can access the thread struct of Q and free the page table entry in Q's page table using the function pagedir_clear_page ().
+
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
+Since from the testcase infomation, the furthest page fault might be caused by PUSHA which is 32 bytes lower than esp, we do the heuristic by comparing fault address with esp-32. If the fault address is lower than esp-32, it's judged as invalid page fault. Otherwise, we extend the stack.
+
 
 ---- SYNCHRONIZATION ----
 
@@ -76,23 +138,27 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> particular, explain how it prevents deadlock.  (Refer to the
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
+We design the global frame table and swap table and a supplement page table for each process/thread. To make sure the synchronization of frame table, we set frame_lock in the process of frame allocation, frame removing, frame freeing, and eviction_lock for frame eviction. As for swap_table, we set global swap_lock in swap.c. For these parts, we design separate locks to prevent deadlock caused by operation confusion. Additionally, we do many checking to ensure that it won't occured that holding one lock and acquire another lock, which means no deadlock. 
 
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
 >> the page during the eviction process?  How do you avoid a race
 >> between P evicting Q's frame and Q faulting the page back in?
+We set a lock named as eviction_lock in fram eviction. It has to hold the eviction_lock before getting the page table entry of the page. When doing eviction, the eviction_lock is held by the current thread so that process Q only keeps waiting for the eviction_lock until the eviction finishes. Thus During the eviction process, Q won't access or modify the page. 
 
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
 >> cannot interfere by e.g. attempting to evict the frame while it is
 >> still being read in?
 
+We design an attribute named as "evictable" to indicate whether this frame table entry is evictable. If the evictable is false, it means it cannot be evicted temporarily. We set it as false before reading from file system or swap to avoid being evicted.
+
 >> B8: Explain how you handle access to paged-out pages that occur
 >> during system calls.  Do you use page faults to bring in pages (as
 >> in user programs), or do you have a mechanism for "locking" frames
 >> into physical memory, or do you use some other design?  How do you
 >> gracefully handle attempted accesses to invalid virtual addresses?
-
+////
 ---- RATIONALE ----
 
 >> B9: A single lock for the whole VM system would make
@@ -102,6 +168,8 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> where your design falls along this continuum and why you chose to
 >> design it this way.
 
+We design locks respectively for swap, frame. For frame table entry, we set the global lock "frame_lock" in frame.c for their implementation. "frame_lock" guarantees the synchronization during getting frame, removing frame, freeing frame,and etc. For swapping, we add "eviction_lock" to protect the synchronization for the racing between several process. Therefore, designing the separate synchronization for these parts can not only increase the clearness of our coding, but also decline the deadlock possibility. We try to contract the range of locked block to support parallelism by carefully coding design.
+
              MEMORY MAPPED FILES
              ===================
 
@@ -110,15 +178,31 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+struct mmfile stores the information of each mmfile, like mapID, mapped file, start
+address in memory, and page count.
+struct mmfile
+{
+  mapid_t mapid;
+  struct file* file;
+  void * start_addr;
+  unsigned pg_cnt; 
+  struct hash_elem elem;
+};
+
+Add two attribute to struct thread.
+mapid_t mapid_allocator;
+struct hash mmfiles;
 
 ---- ALGORITHMS ----
 
 >> C2: Describe how memory mapped files integrate into your virtual
 >> memory subsystem.  Explain how the page fault and eviction
 >> processes differ between swap pages and other pages.
+Each thread has a hash table of memory mapped files which will be initialized at the beginning of the process. And there are two main operation for memory mapped files -- mmap and munmap. System call mmap will load file into memory and give and map id. And system call munmap do free the memory. When munmap, the dirty pages have to write back to the file before free.
 
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
+In function mmfile_insert(), the input parameters tell us the file_length and start_address. We check if start_address+k*file_length have been mapped in a while-loop, assuming that it needs n pages, k = 1,2,...,n-1. ///////
 
 ---- RATIONALE ----
 
@@ -128,6 +212,8 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> that much of their implementation can be shared.  Explain why your
 >> implementation either does or does not share much of the code for
 >> the two situations.
+We found out some similarity between the two processes and they are all based on files, so we choose to share the code for the two situtations. To achieve sharing, We add an attribute named "data" typed of suppl_pte_data in supplement page table. And in the later impelmentation, it proved that there are many common implementation situtation. 
+
 
                SURVEY QUESTIONS
                ================
