@@ -251,7 +251,7 @@ sys_read(struct intr_frame *f)
       spte = get_suppl_pte (&t->suppl_page_table, pg_round_down (buffer_tmp));
       if (spte != NULL && !spte->is_loaded)
         load_page (spte);
-            else if (spte == NULL && buffer_tmp >= (f->esp - 32))
+      else if (spte == NULL && buffer_tmp >= (f->esp - 32))
         grow_stack (buffer_tmp);
       else
         exit_ret (-1);

@@ -746,26 +746,26 @@ mmfiles_free_entry (struct mmfile* mmf_ptr)
   offset = 0;
   while (pg_cnt-- > 0)
   {
-      spte.usr_vadr = mmf_ptr->start_addr + offset;
-      he = hash_delete (&t->suppl_page_table, &spte.elem);
-      if (he != NULL)
-	{
-	  spte_ptr = hash_entry (he, struct suppl_pte, elem);
-	  if (spte_ptr->is_loaded
-	      && pagedir_is_dirty (t->pagedir, spte_ptr->usr_vadr))
-	    {
-	      lock_acquire (&file_lock);
-	      file_seek (spte_ptr->data.mmf_page.file, 
-			  spte_ptr->data.mmf_page.ofs);
-	      file_write (spte_ptr->data.mmf_page.file, 
-			  spte_ptr->usr_vadr,
-			  spte_ptr->data.mmf_page.read_bytes);
-	      lock_release (&file_lock);
-	    }
-	  free (spte_ptr);
-	}
-      offset += PGSIZE;
-    }
+    spte.usr_vadr = mmf_ptr->start_addr + offset;
+    he = hash_delete (&t->suppl_page_table, &spte.elem);
+    if (he != NULL)
+    {
+      spte_ptr = hash_entry (he, struct suppl_pte, elem);
+      if (spte_ptr->is_loaded
+          && pagedir_is_dirty (t->pagedir, spte_ptr->usr_vadr))
+      {
+        lock_acquire (&file_lock);
+        file_seek (spte_ptr->data.mmf_page.file, 
+        spte_ptr->data.mmf_page.ofs);
+        file_write (spte_ptr->data.mmf_page.file, 
+        spte_ptr->usr_vadr,
+        spte_ptr->data.mmf_page.read_bytes);
+        lock_release (&file_lock);
+      }
+      free (spte_ptr);
+    }   
+    offset += PGSIZE;
+  }
 
   lock_acquire (&file_lock);
   file_close (mmf_ptr->file);

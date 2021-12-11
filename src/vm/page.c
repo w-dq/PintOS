@@ -186,7 +186,7 @@ load_page_file (struct suppl_pte *spte)
 
     fm = get_frame(kpage);
     fm->evictable = true;
-    
+
     spte->is_loaded = true;
     
     return true;
