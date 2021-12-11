@@ -20,41 +20,39 @@ typedef void (*syscall_func)(struct intr_frame * UNUSED);
 syscall_func syscalls[20];
 int max_files = 200;
 
-bool is_valid_ptr (const void *);
-static bool is_valid_uvaddr (const void *);
+bool is_valid_ptr (const void*);
+static bool is_valid_uvaddr(const void*);
 
-static void syscall_handler (struct intr_frame *);
-struct file_node * file_find(struct list *,int);
+static void syscall_handler(struct intr_frame*);
+struct file_node* file_find(struct list*,int);
 void exit_ret(int);
 
 void 
-exit_ret(int ret_status)
-{
+exit_ret(int ret_status){
   thread_current()->ret_status = ret_status;
   thread_exit();
 }
 
 bool
-is_valid_ptr (const void *usr_ptr)
-{
+is_valid_ptr(const void* usr_ptr){
   struct thread *cur = thread_current ();
   if (is_valid_uvaddr (usr_ptr))
-    {
-      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
-    }
+  {
+    return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
+  }
   return false;
 }
 
 static bool
-is_valid_uvaddr (const void *uvaddr)
+is_valid_uvaddr(const void* uvaddr)
 {
   return (uvaddr != NULL && is_user_vaddr (uvaddr));
 }
 
 void
-syscall_init (void) 
+syscall_init(void) 
 {
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
   
   syscalls[SYS_HALT] = sys_halt;
   syscalls[SYS_EXIT] = sys_exit;
@@ -81,11 +79,11 @@ syscall_init (void)
 }
 
 /* find file_node representing fd. */ 
-struct file_node * 
-file_find(struct list *file_list,int fd)
+struct file_node* 
+file_find(struct list* file_list,int fd)
 {
-  struct list_elem *e;
-  struct file_node * fn = NULL;
+  struct list_elem* e;
+  struct file_node* fn = NULL;
   for(e = list_begin(file_list); e != list_end(file_list); e = list_next(e)){
     fn = list_entry(e,struct file_node,elem);
     if (fn->fd == fd){
@@ -96,8 +94,7 @@ file_find(struct list *file_list,int fd)
 }
 
 static void 
-syscall_handler (struct intr_frame *f)
-{ 
+syscall_handler(struct intr_frame* f){ 
   if (!is_user_vaddr(f->esp)) exit_ret(-1);
   int number = *(int*)(f->esp);
   if ((number > SYS_INUMBER) || (number < 0)){
@@ -108,14 +105,12 @@ syscall_handler (struct intr_frame *f)
 }
 
 void 
-sys_halt(struct intr_frame *f UNUSED)
-{
+sys_halt(struct intr_frame* f UNUSED){
   shutdown_power_off();
 }
 
 void 
-sys_exit(struct intr_frame *f)
-{
+sys_exit(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   thread_current()->ret_status = *(int*)(f->esp+4);
   f->eax = 0;
@@ -123,8 +118,7 @@ sys_exit(struct intr_frame *f)
 }
 
 void 
-sys_exec(struct intr_frame *f)
-{
+sys_exec(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
   char* file_name = (char*)(*(int*)(f->esp+4));
@@ -138,8 +132,7 @@ sys_exec(struct intr_frame *f)
 }
 
 void 
-sys_wait(struct intr_frame *f)
-{
+sys_wait(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   tid_t pid = *(tid_t*)(f->esp+4);
   if (pid != -1)
@@ -151,8 +144,7 @@ sys_wait(struct intr_frame *f)
 }
 
 void 
-sys_create(struct intr_frame *f)
-{
+sys_create(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+8)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+4)))) exit_ret(-1);
   
@@ -169,8 +161,7 @@ sys_create(struct intr_frame *f)
 }
 
 void 
-sys_remove(struct intr_frame *f)
-{
+sys_remove(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+4)))) exit_ret(-1);
   lock_acquire(&file_lock);
@@ -180,8 +171,7 @@ sys_remove(struct intr_frame *f)
 }
 
 void 
-sys_open_file(struct intr_frame *f)
-{ 
+sys_open_file(struct intr_frame* f){ 
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+4)))) exit_ret(-1);
   char* file_name = (char*)(*(int*)(f->esp+4));
@@ -209,8 +199,7 @@ sys_open_file(struct intr_frame *f)
 }
 
 void 
-sys_filesize(struct intr_frame *f)  
-{
+sys_filesize(struct intr_frame* f){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   int fd = *(int*)(f->esp+4);
   struct file_node * openf = file_find(&(thread_current()->open_file_list),fd);
@@ -226,35 +215,34 @@ sys_filesize(struct intr_frame *f)
 
 
 void 
-sys_read(struct intr_frame *f)
-{   
+sys_read(struct intr_frame* f){   
   if (!is_user_vaddr(f->esp+12)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+8)))) exit_ret(-1);
   int fd = *(int*)(f->esp+4);
   char* buffer = (char*)(*(int*)(f->esp+8));
   unsigned size = *(unsigned*)(f->esp+12);
 
-  struct thread *t = thread_current ();
+  struct thread* t = thread_current();
 
   unsigned buffer_size = size;
-  void * buffer_tmp = buffer;
+  void* buffer_tmp = buffer;
 
   /* check the user memory pointing by buffer are valid */
   while (buffer_tmp != NULL)
   {
-    if (!is_valid_uvaddr (buffer_tmp))
-      exit_ret (-1);
+    if (!is_valid_uvaddr(buffer_tmp))
+      exit_ret(-1);
 
-    if (pagedir_get_page (t->pagedir, buffer_tmp) == NULL)   
+    if (pagedir_get_page(t->pagedir, buffer_tmp) == NULL)   
     { 
       struct suppl_pte *spte;
       spte = get_suppl_pte (&t->suppl_page_table, pg_round_down (buffer_tmp));
       if (spte != NULL && !spte->is_loaded)
-        load_page (spte);
+        load_page(spte);
       else if (spte == NULL && buffer_tmp >= (f->esp - 32))
         grow_stack (buffer_tmp);
       else
-        exit_ret (-1);
+        exit_ret(-1);
     }
     
     /* Advance */
@@ -424,7 +412,6 @@ void sys_mmap(struct intr_frame *f){
     return;
   } 
 
-  
   struct file_node * openf = file_find(&cur->open_file_list,fd);
   if (openf == NULL){
     f->eax = -1;
@@ -454,7 +441,7 @@ void sys_mmap(struct intr_frame *f){
 }
 
 /* Remove a memory mapping. */
-void sys_munmap(struct intr_frame *f UNUSED){
+void sys_munmap(struct intr_frame* f UNUSED){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
   /* this is added to because there is a bug that would cause the 'make check'
      or 'make grade' command to susbend while checking or grading, we are afraid
@@ -466,7 +453,7 @@ void sys_munmap(struct intr_frame *f UNUSED){
      have to run 'make check' or 'make grade' up to six times to get the result for 
      all cases, since for some case 'make check' or 'make grade' will stop. */
   mapid_t mapping = *(mapid_t*)(f->esp+4);
-  mmfiles_remove (mapping);
+  mmfiles_remove(mapping);
 }
 
 // for proj4

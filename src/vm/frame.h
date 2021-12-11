@@ -15,14 +15,14 @@ struct frame{
 
 struct list frames;
 
-void frame_init (void);
+void frame_init(void);
 void* frame_allocate(enum palloc_flags flags);
-void frame_free (void *);
+void frame_free(void*);
 
-void frame_set_usr (void*, uint32_t *, void *);
+void frame_set_usr(void*, uint32_t*, void*);
 
 /* evict a frame to be freed and write the content to swap slot or file*/
-void* evict_frame (void);
+void* evict_frame(void);
 
 struct frame* get_frame(void*);
 

@@ -196,7 +196,7 @@ pagedir_set_dirty (uint32_t *pd, const void *vpage, bool dirty)
 bool
 pagedir_is_accessed (uint32_t *pd, const void *vpage) 
 {
-  uint32_t *pte = lookup_page (pd, vpage, false);
+  uint32_t *pte = lookup_page(pd, vpage, false);
   return pte != NULL && (*pte & PTE_A) != 0;
 }
 
@@ -205,7 +205,7 @@ pagedir_is_accessed (uint32_t *pd, const void *vpage)
 void
 pagedir_set_accessed (uint32_t *pd, const void *vpage, bool accessed) 
 {
-  uint32_t *pte = lookup_page (pd, vpage, false);
+  uint32_t *pte = lookup_page(pd, vpage, false);
   if (pte != NULL) 
     {
       if (accessed)
@@ -236,7 +236,7 @@ pagedir_activate (uint32_t *pd)
 
 /* Returns the currently active page directory. */
 static uint32_t *
-active_pd (void) 
+active_pd(void) 
 {
   /* Copy CR3, the page directory base register (PDBR), into
      `pd'.
@@ -256,7 +256,7 @@ active_pd (void)
    directory.  (If PD is not active then its entries are not in
    the TLB, so there is no need to invalidate anything.) */
 static void
-invalidate_pagedir (uint32_t *pd) 
+invalidate_pagedir(uint32_t *pd) 
 {
   if (active_pd () == pd) 
     {
