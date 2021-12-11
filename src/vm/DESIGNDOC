@@ -48,7 +48,6 @@ struct suppl_pte
   bool swap_writable;
   bool swap_dirty;
 
-  struct lock spte_lock;
   struct hash_elem elem;
 };
 
@@ -139,7 +138,7 @@ Since from the testcase infomation, the furthest page fault might be caused by P
 >> particular, explain how it prevents deadlock.  (Refer to the
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
-We design the global frame table and swap table and a supplement page table for each process/thread. To make sure the synchronization of frame table, we set frame_lock in the process of frame allocation, frame removing, frame freeing, and eviction_lock for frame eviction. As for swap_table, we set global swap_lock in swap.c. And for each supplement page entry, allocate a spte_lock to protect the consistency of the page entry. For the three parts, we design separate locks to prevent deadlock caused by operation confusion. Additionally, we do many checking to ensure that it won't occured that holding one lock and acquire another lock, which means no deadlock. 
+We design the global frame table and swap table and a supplement page table for each process/thread. To make sure the synchronization of frame table, we set frame_lock in the process of frame allocation, frame removing, frame freeing, and eviction_lock for frame eviction. As for swap_table, we set global swap_lock in swap.c. For these parts, we design separate locks to prevent deadlock caused by operation confusion. Additionally, we do many checking to ensure that it won't occured that holding one lock and acquire another lock, which means no deadlock. 
 
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
@@ -169,7 +168,7 @@ We design an attribute named as "evictable" to indicate whether this frame table
 >> where your design falls along this continuum and why you chose to
 >> design it this way.
 
-We design locks respectively for swap, frame and page. As for supplement page table entry, we set an attribute named "spte_lock" for each each spte, which also allow the consistency of certain spte. For frame table entry, we set the global lock "frame_lock" in frame.c for their implementation. "frame_lock" guarantees the synchronization during getting frame, removing frame, freeing frame,and etc. For swapping, we add "eviction_lock" to protect the synchronization for the racing between several process. Therefore, designing the separate synchronization for these three parts can not only increase the clearness of our coding, but also decline the deadlock possibility. We try to contract the range of locked block to support parallelism by carefully coding design.
+We design locks respectively for swap, frame. For frame table entry, we set the global lock "frame_lock" in frame.c for their implementation. "frame_lock" guarantees the synchronization during getting frame, removing frame, freeing frame,and etc. For swapping, we add "eviction_lock" to protect the synchronization for the racing between several process. Therefore, designing the separate synchronization for these parts can not only increase the clearness of our coding, but also decline the deadlock possibility. We try to contract the range of locked block to support parallelism by carefully coding design.
 
              MEMORY MAPPED FILES
              ===================
