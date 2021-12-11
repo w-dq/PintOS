@@ -158,7 +158,11 @@ We design an attribute named as "evictable" to indicate whether this frame table
 >> in user programs), or do you have a mechanism for "locking" frames
 >> into physical memory, or do you use some other design?  How do you
 >> gracefully handle attempted accesses to invalid virtual addresses?
-////
+
+brought out pages are checked before entering the syscall's funtionality
+the evictable boolean is set to false so it won't be considered when evicting
+invalid addresses are handle in precheck and would return -1 when invalid.
+
 ---- RATIONALE ----
 
 >> B9: A single lock for the whole VM system would make
