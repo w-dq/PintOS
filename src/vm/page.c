@@ -9,11 +9,13 @@
 #include "userprog/syscall.h"
 #include "filesys/file.h"
 
+/* placeholder initalization */
 void
 vm_page_init(void){
     return;
 }
 
+/* hash function for hash table suppl page table*/
 unsigned 
 suppl_pt_hash(const struct hash_elem* he, void* aux UNUSED){
     struct suppl_pte* vspte;
@@ -21,6 +23,7 @@ suppl_pt_hash(const struct hash_elem* he, void* aux UNUSED){
     return hash_bytes(&(vspte->usr_vadr),sizeof(vspte->usr_vadr));
 }
 
+/* less function for hash table  */
 bool 
 suppl_pt_less(const struct hash_elem* a, const struct hash_elem* b, void* aux UNUSED){
     const struct suppl_pte* vspte_a;
@@ -32,6 +35,7 @@ suppl_pt_less(const struct hash_elem* a, const struct hash_elem* b, void* aux UN
     return (vspte_a->usr_vadr - vspte_b->usr_vadr) < 0;
 }
 
+/* insert a spte to spt via hash table functions */
 bool 
 insert_suppl_pte (struct hash *spt, struct suppl_pte *spte)
 {
@@ -47,6 +51,7 @@ insert_suppl_pte (struct hash *spt, struct suppl_pte *spte)
   return true;
 }
 
+/* insert an spte of tyoe file to suppl page table */
 bool
 suppl_pt_insert_file (struct file *file, off_t ofs, uint8_t *upage, 
 		      uint32_t read_bytes, uint32_t zero_bytes, bool writable)
@@ -76,6 +81,8 @@ suppl_pt_insert_file (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+
+/* inset an spte of type mmf to suppl page table */
 bool
 suppl_pt_insert_mmf (struct file *file, off_t ofs, uint8_t *upage, 
 		      uint32_t read_bytes)
@@ -103,6 +110,7 @@ suppl_pt_insert_mmf (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+/* get an entry in suppl page table accoring to uvaddress which is the key */
 struct suppl_pte *
 get_suppl_pte (struct hash *ht, void *uvaddr)
 {
@@ -114,17 +122,21 @@ get_suppl_pte (struct hash *ht, void *uvaddr)
   return e != NULL ? hash_entry (e, struct suppl_pte, elem) : NULL;
 }
 
+/* writing an mmf back to file sys, this is required when page is dirty */
 void write_page_back_to_file_wo_lock (struct suppl_pte *spte)
 {
   if (spte->type == MMF)
     {
+      // lock_acquire(&file_lock);
       file_seek (spte->data.mmf_page.file, spte->data.mmf_page.ofs);
       file_write (spte->data.mmf_page.file, 
                   spte->usr_vadr,
                   spte->data.mmf_page.read_bytes);
+      // lock_release(&file_lock);
     }
 }
 
+/* free the entry represented by the hash emelent */
 static void
 free_suppl_pte (struct hash_elem *e, void *aux UNUSED)
 {
@@ -136,28 +148,28 @@ free_suppl_pte (struct hash_elem *e, void *aux UNUSED)
   free (spte);
 }
 
+/* free the entire hash table*/
 void free_suppl_pt (struct hash *suppl_pt) 
 {
   hash_destroy (suppl_pt, free_suppl_pte);
 }
 
+
+/* read file from suppl pt to a page of memory and add the page to address space */
 static bool
 load_page_file (struct suppl_pte *spte)
 {
     struct thread *cur = thread_current ();
-    
-    file_seek (spte->data.file_page.file, spte->data.file_page.ofs);
+    struct frame* fm;
 
-    /* Get a page of memory. */
+    file_seek (spte->data.file_page.file, spte->data.file_page.ofs);
     uint8_t *kpage = frame_allocate (PAL_USER);
     if (kpage == NULL)
         return false;
     
-    /* Load this page. */
-    if (file_read (spte->data.file_page.file, kpage,
-            spte->data.file_page.read_bytes)
-        
-        != (int) spte->data.file_page.read_bytes)
+    off_t read_ret = file_read (spte->data.file_page.file, kpage,
+            spte->data.file_page.read_bytes);
+    if (read_ret != (int) spte->data.file_page.read_bytes)
     {
         frame_free (kpage);
         return false; 
@@ -165,36 +177,39 @@ load_page_file (struct suppl_pte *spte)
     memset (kpage + spte->data.file_page.read_bytes, 0,
         spte->data.file_page.zero_bytes);
     
-    /* Add the page to the process's address space. */
     if (!pagedir_set_page (cur->pagedir, spte->usr_vadr, kpage,
                 spte->data.file_page.writable))
     {
         frame_free (kpage);
         return false; 
     }
+
+    fm = get_frame(kpage);
+    fm->evictable = true;
     
     spte->is_loaded = true;
+    
     return true;
 }
 
 
-/* Load a mmf page whose details are defined in struct suppl_pte */
+/* Load a mmf page defined in struct suppl_pte to a page in 
+   memory and adding the page to address space */
 static bool
 load_page_mmf (struct suppl_pte *spte)
 {
     struct thread *cur = thread_current ();
+    struct frame* fm;
 
     file_seek (spte->data.mmf_page.file, spte->data.mmf_page.ofs);
-
-    /* Get a page of memory. */
     uint8_t *kpage = frame_allocate (PAL_USER);
     if (kpage == NULL)
         return false;
 
-    /* Load this page. */
-    if (file_read (spte->data.mmf_page.file, kpage,
-            spte->data.mmf_page.read_bytes)
-        != (int) spte->data.mmf_page.read_bytes)
+    off_t read_ret = file_read (spte->data.mmf_page.file, kpage,
+            spte->data.mmf_page.read_bytes);
+
+    if (read_ret != (int) spte->data.mmf_page.read_bytes)
     {
         frame_free (kpage);
         return false; 
@@ -202,12 +217,14 @@ load_page_mmf (struct suppl_pte *spte)
     memset (kpage + spte->data.mmf_page.read_bytes, 0,
         PGSIZE - spte->data.mmf_page.read_bytes);
 
-    /* Add the page to the process's address space. */
     if (!pagedir_set_page (cur->pagedir, spte->usr_vadr, kpage, true)) 
     {
         frame_free (kpage);
         return false; 
     }
+
+    fm = get_frame(kpage);
+    fm->evictable = true;
 
     spte->is_loaded = true;
     if (spte->type & SWAP)
@@ -216,16 +233,18 @@ load_page_mmf (struct suppl_pte *spte)
     return true;
 }
 
-/* Load a zero page whose details are defined in struct suppl_pte */
+/* load a page from the swap defined in the suppl_pte into memory
+   After swap in, remove the corresponding entry in suppl page table */
 static bool
 load_page_swap (struct suppl_pte *spte)
 {
-  /* Get a page of memory. */
+    struct frame* fm;
+
     uint8_t *kpage = frame_allocate (PAL_USER);
+
     if (kpage == NULL)
         return false;
 
-    /* Map the user page to given frame */
     if (!pagedir_set_page (thread_current ()->pagedir, spte->usr_vadr, kpage, 
                 spte->swap_writable))
     {
@@ -233,12 +252,12 @@ load_page_swap (struct suppl_pte *spte)
         return false;
     }
 
-    /* Swap data from disk into memory page */
     vm_swap_in (spte->swap_slot_idx, spte->usr_vadr);
-
+    fm = get_frame(kpage);
+    fm->evictable = true;
+    
     if (spte->type == SWAP)
     {
-        /* After swap in, remove the corresponding entry in suppl page table */
         hash_delete (&thread_current ()->suppl_page_table, &spte->elem);
     }
     if (spte->type == (FILE | SWAP))
@@ -250,10 +269,12 @@ load_page_swap (struct suppl_pte *spte)
     return true;
 }
 
+/* handler function, load page data to page */
 bool
 load_page (struct suppl_pte *spte)
 {
     bool success = false;
+    // lock_acquire(&file_lock);
     switch (spte->type)
     {
         case FILE:
@@ -270,25 +291,27 @@ load_page (struct suppl_pte *spte)
         default:
             break;
     }
+    // lock_release(&file_lock);
     return success;
 }
 
+/* map uvadress to a newly allocated page which grows the stack 
+   add the page to the process's address space. */ 
 void 
 grow_stack (void *uvaddr)
 {
     void *spage;
     struct thread *t = thread_current ();
+    struct frame* fm;
+    
     spage = frame_allocate (PAL_USER | PAL_ZERO);
-    if (spage == NULL)
-            return;
-    else
-    {
-        /* Add the page to the process's address space. */
+    if (spage == NULL) return;
+    else {
         if (!pagedir_set_page (t->pagedir, pg_round_down (uvaddr), spage, true))
-        {
-        frame_free (spage); 
-        }
+          frame_free (spage); 
     }
+    fm = get_frame(spage);
+    fm->evictable = true;
 }
 
 

@@ -14,12 +14,12 @@
 
 static struct lock frame_lock;
 static struct lock eviction_lock;
-static struct frame* get_frame(void*);
 static struct frame* frame_to_evict();
 static bool save_evicted_frame (struct frame* ev_f);
 static void remove_frame_entry(void*);
 static bool append_frame(void*);
 
+/* initialize the frame table and locks*/
 void
 frame_init ()
 {
@@ -28,10 +28,14 @@ frame_init ()
   lock_init (&eviction_lock);
 }
 
-/* allocate a page from USER_POOL, and add an entry to frame table */
+/* allocate a page from USER_POOL, and add an entry to frame table 
+   if palloc not sucess, eviction of frame is needed. if allocation successed,
+   append to the frame list */
 void* 
 frame_allocate(enum palloc_flags flags){
+    struct frame* fm;
     void* f = NULL;
+
     if (flags & PAL_USER)
     {
       if (flags & PAL_ZERO)
@@ -44,21 +48,22 @@ frame_allocate(enum palloc_flags flags){
         append_frame(f);
     }
     else{
-        void* evict_f = evict_frame ();
-        if (evict_f == NULL) PANIC ("Evicting frame failed");
-        return evict_f;
+        f = evict_frame ();
+        if (f == NULL) PANIC ("Evicting frame failed");
     } 
+    fm = get_frame(f);
+    fm->evictable = false;
     return f;
 }
 
+/* remove frame table entry then free frame physically. */
 void 
 frame_free (void* f){
-    /* remove frame table entry */
     remove_frame_entry(f);
-    /* free frame physically */
     palloc_free_page(f);
 }
 
+/* mapping pte attributes to frame table */
 void 
 frame_set_usr (void* fm, uint32_t* pte, void* uvadr){
     struct frame* f = get_frame(fm);
@@ -68,7 +73,9 @@ frame_set_usr (void* fm, uint32_t* pte, void* uvadr){
     }
 }
 
-/* evict a frame and save its content for later swap in */
+/* frame eviction, select frame to evict and save the content to
+   swap, then allocate the frame to current thread, frame_adr don't
+   need to be changed since physical address doesn't change */
 void*
 evict_frame (void){
     bool result;
@@ -89,7 +96,8 @@ evict_frame (void){
     return ev_f->frame_adr;
 }
 
-static struct frame*
+/* traverse the frame table to find the frame */
+struct frame*
 get_frame(void* f){
     struct frame *fm;
     struct list_elem *e;
@@ -109,7 +117,10 @@ get_frame(void* f){
     return fm;
 }
 
-/* select a frame to evict */
+/* select a frame to evict. iterate the frame list to find the first 
+   frame that is not recently accessed while resetting the accessed indicator
+   if nothing is found on the first round then it is similar to the "clock" or
+   "second chance" algo*/
 static struct frame*
 frame_to_evict(){
     struct frame *ev_f;
@@ -126,7 +137,7 @@ frame_to_evict(){
             ev_f = list_entry(e, struct frame, elem);
             t = get_thread_by_tid(ev_f->tid);
             bool accessed = pagedir_is_accessed(t->pagedir, ev_f->user_vadr);
-            if (!accessed){
+            if (!accessed && ev_f->evictable){
                 class0 = ev_f;
                 list_remove(e);
                 list_push_back(&frames,e);
@@ -144,6 +155,8 @@ frame_to_evict(){
     return class0;
 
 }
+
+/* there may be a problem since swap_slot_idx is not initalized for mmf */
 static bool
 save_evicted_frame (struct frame* ev_f){
     struct thread *t;
@@ -184,6 +197,7 @@ save_evicted_frame (struct frame* ev_f){
     return true;
 }
 
+/* iterate frame table to evict entry and free memory space */
 static void
 remove_frame_entry(void* f){
     struct frame *fm;
@@ -204,6 +218,7 @@ remove_frame_entry(void* f){
     lock_release(&frame_lock);
 }
 
+/* appending an entry to frame table. operations on frame table need sync*/
 static bool
 append_frame(void* f){
     struct frame* fm;

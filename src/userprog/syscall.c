@@ -34,6 +34,23 @@ exit_ret(int ret_status)
   thread_exit();
 }
 
+bool
+is_valid_ptr (const void *usr_ptr)
+{
+  struct thread *cur = thread_current ();
+  if (is_valid_uvaddr (usr_ptr))
+    {
+      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
+    }
+  return false;
+}
+
+static bool
+is_valid_uvaddr (const void *uvaddr)
+{
+  return (uvaddr != NULL && is_user_vaddr (uvaddr));
+}
+
 void
 syscall_init (void) 
 {
@@ -375,10 +392,17 @@ sys_close(struct intr_frame *f)
 }
 
 // for proj3
-/* Map a file into memory. */
+/* Map a file into memory. lazyily load pages and back storing for mapping
+   returns mapping ID on success that identifies the mapping within the process
+   file length can not be zero cannot be bad file descriptor and have to check 
+   for enough space for the file. */
 void sys_mmap(struct intr_frame *f){
   if (!is_user_vaddr(f->esp+8)) exit_ret(-1);
   if (!is_user_vaddr((*(int*)(f->esp+8)))) exit_ret(-1);
+
+  // f->eax = -1;
+  // return;
+
   int fd = *(int*)(f->esp+4);
   void* addr = *(int*)(f->esp+8);
 
@@ -404,7 +428,7 @@ void sys_mmap(struct intr_frame *f){
     f->eax = -1;
     return;
   } 
-  /* check if there is enough space for the file starting from the uvaddr addr*/
+
   int offset = 0;
   while (offset < file_len)
   {
@@ -425,6 +449,8 @@ void sys_mmap(struct intr_frame *f){
 /* Remove a memory mapping. */
 void sys_munmap(struct intr_frame *f UNUSED){
   if (!is_user_vaddr(f->esp+4)) exit_ret(-1);
+  // f->eax = -1;
+  // return;
   mapid_t mapping = *(mapid_t*)(f->esp+4);
   mmfiles_remove (mapping);
 }
@@ -444,22 +470,4 @@ void sys_isdir(struct intr_frame *f UNUSED){
 }
 void sys_inumber(struct intr_frame *f UNUSED){
   printf("sys_inumber");
-}
-
-
-bool
-is_valid_ptr (const void *usr_ptr)
-{
-  struct thread *cur = thread_current ();
-  if (is_valid_uvaddr (usr_ptr))
-    {
-      return (pagedir_get_page (cur->pagedir, usr_ptr)) != NULL;
-    }
-  return false;
-}
-
-static bool
-is_valid_uvaddr (const void *uvaddr)
-{
-  return (uvaddr != NULL && is_user_vaddr (uvaddr));
 }
