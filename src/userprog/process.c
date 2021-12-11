@@ -577,6 +577,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  struct frame* fm;
+
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -606,6 +608,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           frame_free (kpage);
           return false; 
         }
+              
+      fm = get_frame(kpage);
+      fm->evictable = true;
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -622,11 +627,14 @@ setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
+  struct frame* fm;
 
   kpage = frame_allocate (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      fm = get_frame(kpage);
+      fm->evictable = true;
       if (success)
         *esp = PHYS_BASE;
       else
@@ -654,12 +662,15 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+
+/* hash function for mmfile */
 unsigned
 mmfile_hash(const struct hash_elem *e, void *aux UNUSED){
   const struct mmfile *p = hash_entry (e, struct mmfile, elem);
   return hash_bytes (&p->mapid, sizeof p->mapid);
 }
 
+/* hash required functionality */
 bool 
 mmfile_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED){
   const struct mmfile* fa = hash_entry (a, struct mmfile, elem);
@@ -667,6 +678,7 @@ mmfile_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUS
   return (fa->mapid < fb->mapid);
 }
 
+/* adding and entry to the memory file table and suppl pt. */
 mapid_t 
 mmfiles_insert(void *addr, struct file* file, int32_t len){
   struct thread* cur = thread_current();
@@ -675,6 +687,7 @@ mmfiles_insert(void *addr, struct file* file, int32_t len){
 
   mmf = calloc (1, sizeof(mmf));
   if (mmf == NULL) return -1;
+  
   mmf->mapid = cur->mapid_allocator++;
   mmf->file = file;
   mmf->start_addr = addr;
@@ -698,6 +711,8 @@ mmfiles_insert(void *addr, struct file* file, int32_t len){
   return mmf->mapid; 
 }
 
+/* removing an entry from mmf table, also remove from spt
+   by calling mmfiles_free_entry. */
 void mmfiles_remove (mapid_t mapping){
   struct thread *cur = thread_current ();
   struct mmfile mmf;
@@ -705,8 +720,7 @@ void mmfiles_remove (mapid_t mapping){
   struct hash_elem *he;
 
   mmf.mapid = mapping;
-  // hash_elem* e = list_head(&cur->mmfiles);
-  // for 
+
   he = hash_delete (&cur->mmfiles, &mmf.elem);
   if (he != NULL)
     {
@@ -714,6 +728,10 @@ void mmfiles_remove (mapid_t mapping){
       mmfiles_free_entry (mmf_ptr);
     }
 }
+
+/* used in mmfiles_remove and free_mmfiles_entry. 
+   checks for dirty pages and writing back to files 
+   free from suppl_pte. */
 static void
 mmfiles_free_entry (struct mmfile* mmf_ptr)
 {
@@ -727,11 +745,7 @@ mmfiles_free_entry (struct mmfile* mmf_ptr)
   pg_cnt = mmf_ptr->pg_cnt;
   offset = 0;
   while (pg_cnt-- > 0)
-    {
-      /* Get supplemental page table entry for each page */
-      /* check whether the page is dirty */
-      /* if dirty, write back to the file*/
-      /* free the struct suppl_pte for each entry*/
+  {
       spte.usr_vadr = mmf_ptr->start_addr + offset;
       he = hash_delete (&t->suppl_page_table, &spte.elem);
       if (he != NULL)
@@ -740,7 +754,6 @@ mmfiles_free_entry (struct mmfile* mmf_ptr)
 	  if (spte_ptr->is_loaded
 	      && pagedir_is_dirty (t->pagedir, spte_ptr->usr_vadr))
 	    {
-	      /* write back to disk */
 	      lock_acquire (&file_lock);
 	      file_seek (spte_ptr->data.mmf_page.file, 
 			  spte_ptr->data.mmf_page.ofs);
@@ -761,16 +774,21 @@ mmfiles_free_entry (struct mmfile* mmf_ptr)
   free (mmf_ptr);
 }
 
+/* destroy the memory map file table */
 void 
 free_mmfiles (struct hash *mmfiles)
 {
   hash_destroy (mmfiles, free_mmfiles_entry);
 }
 
+/* free resource for each entry in memory map file table */
 static void
 free_mmfiles_entry (struct hash_elem *e, void *aux UNUSED)
 {
+  struct thread *cur = thread_current ();
   struct mmfile *mmf;
+
   mmf = hash_entry (e, struct mmfile, elem);
+  hash_delete (&cur->mmfiles, &mmf->elem);
   mmfiles_free_entry (mmf);
 }
