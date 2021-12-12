@@ -697,7 +697,7 @@ mmfiles_insert(void *addr, struct file* file, int32_t len){
   }
 
   mmf->pg_cnt = pg_cnt; 
-result = hash_insert(&(cur->mmfiles), &mmf->elem);
+  result = hash_insert(&(cur->mmfiles), &mmf->elem);
   if (result != NULL) return -1;
   return mmf->mapid; 
 }

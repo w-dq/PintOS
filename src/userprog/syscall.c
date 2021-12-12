@@ -392,8 +392,8 @@ void sys_mmap(struct intr_frame *f){
      or 'make grade' command to susbend while checking or grading, we are afraid
      that if this would result in 0 points even though we passed 100/113 cases.
      if this is not hte case we would still pass 100/113 cases */
-  f->eax = -1;
-  return;
+  // f->eax = -1;
+  // return;
   /* feel free to comment these two lines out, just bare in mind that you maight
      have to run 'make check' or 'make grade' up to six times to get the result for 
      all cases, since for some case 'make check' or 'make grade' will stop. */
@@ -426,8 +426,14 @@ void sys_mmap(struct intr_frame *f){
   int offset = 0;
   while (offset < file_len)
   {
-    if (get_suppl_pte(&cur->suppl_page_table, addr + offset)) f->eax = -1;   
-    if (pagedir_get_page (cur->pagedir, addr + offset)) f->eax = -1; 
+    if (!get_suppl_pte(&cur->suppl_page_table, addr + offset)){
+      f->eax = -1;   
+      return;
+    }
+    if (!pagedir_get_page (cur->pagedir, addr + offset)){
+      f->eax = -1; 
+      return;
+    }
     offset += PGSIZE;
   }
   lock_acquire (&file_lock);
@@ -447,8 +453,8 @@ void sys_munmap(struct intr_frame* f UNUSED){
      or 'make grade' command to susbend while checking or grading, we are afraid
      that if this would result in 0 points even though we passed 100/113 cases.
      if this is not hte case we would still pass 100/113 cases */
-  f->eax = -1;
-  return;
+  // f->eax = -1;
+  // return;
   /* feel free to comment these two lines out, just bare in mind that you maight
      have to run 'make check' or 'make grade' up to six times to get the result for 
      all cases, since for some case 'make check' or 'make grade' will stop. */
