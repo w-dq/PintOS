@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -17,9 +18,17 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+
+struct ret_data{
+  int tid;
+  int ret;
+  struct list_elem elem;
+};
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -28,20 +37,29 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy, *fn_parsed;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  fn_copy = (char*) malloc(strlen(file_name)+1);
+  fn_parsed = (char*) malloc(strlen(file_name)+1);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  memcpy (fn_copy, file_name, strlen(file_name)+1);
+  memcpy (fn_parsed, fn_copy, strlen(file_name)+1);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  char* context = NULL;
+  char* token = strtok_r(fn_parsed, " ", &context);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  
+  if (tid == TID_ERROR){
+    free(fn_copy);
+    return TID_ERROR;
+  }
+  sema_down(&thread_current()->load_wait);
+  if(!thread_current()->load_status) return TID_ERROR;
   return tid;
 }
 
@@ -59,12 +77,62 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
 
+  char* context = NULL;
+  char* token = strtok_r(file_name, " ", &context);
+
+  success = load (token, &if_.eip, &if_.esp);
+  lock_acquire(&file_lock);
+  thread_current()->self_elf = filesys_open(token);
+  if(thread_current()->self_elf != NULL) {
+    file_deny_write(thread_current()->self_elf);
+  }
+  lock_release(&file_lock);
+
+  thread_current()->parent->load_status = success;
+  sema_up(&thread_current()->parent->load_wait);
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success){
+    free(file_name);
+    exit_ret(-1);
+  }
+  
+  int argc = 0;
+  int argv[128];
+  do {
+    if_.esp -= (strlen(token) + 1);
+    memcpy(if_.esp, token, strlen(token) + 1);
+    argv[argc] = (int)if_.esp;
+    argc++;
+
+    token = strtok_r(NULL, " ", &context);
+  } while (token != NULL);
+
+  /* word alignment */
+  int zero = 0;
+  while(((int)(if_.esp)) % 4 != 0){
+    if_.esp--;
+  }
+
+  /* string end zero */
+  if_.esp -= 4;
+  memcpy(if_.esp,&zero,4);
+
+  /* push argv value */
+  for(int i = argc - 1; i >= 0; i--){
+    if_.esp -= 4;
+    memcpy(if_.esp, &argv[i], 4);
+  }
+
+  int argv_head = (int)if_.esp;
+  if_.esp -= 4;
+  memcpy(if_.esp, &argv_head, 4);
+  if_.esp -= 4;
+  memcpy(if_.esp, &argc, 4);
+
+  /* fake return address */
+  if_.esp -= 4;
+  memcpy(if_.esp,&zero,4);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -85,10 +153,44 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+
+static int
+get_ret_from_child(struct thread* cur, tid_t child_tid){
+  int ret=-1;
+  struct list_elem* e;
+  for (e=list_begin(&(cur->child_ret_list)); e!=list_end(&(cur->child_ret_list));e=list_next(e)){
+    struct ret_data* rd = list_entry(e,struct ret_data, elem);
+    if (rd->tid == child_tid){
+      ret = rd->ret;
+      rd->ret = -1;
+      break;
+    }
+  }
+  return ret;
+}
+
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct thread* cur = thread_current();
+  struct thread* child = get_thread_by_tid(child_tid); 
+  if (child == NULL||child->status == THREAD_DYING||child->save_ret){ //? finished?
+    return get_ret_from_child(cur,child_tid);
+  }
+  else{
+    cur->is_wait = true;
+    sema_down(&(child->sema_wait)); //? multiple
+    return get_ret_from_child(cur,child_tid);
+  }
+}
+
+
+void
+record_ret(struct thread* t, int tid, int ret){
+  struct ret_data* rd = (struct ret_data*)malloc(sizeof(struct ret_data));
+  rd->tid = tid;
+  rd->ret = ret;
+  list_push_back(&t->child_ret_list,&rd->elem);
 }
 
 /* Free the current process's resources. */
@@ -103,6 +205,33 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL) 
     {
+      printf("%s: exit(%d)\n", cur->name, cur->ret_status);
+
+      while(!list_empty(&cur->open_file_list))
+      {
+        struct file_node * fn = list_entry(list_pop_front(&cur->open_file_list),struct file_node, elem);
+
+        file_close(fn->f);
+
+        free(fn);
+      }
+
+      cur->open_file_num = 0;
+
+      record_ret(cur->parent,cur->tid, cur->ret_status);
+      cur->save_ret = true;
+
+      if(cur->parent!=NULL && cur->parent->is_wait){
+          sema_up(&cur->sema_wait);
+      }
+
+      while(!list_empty(&cur->child_ret_list)){
+        struct ret_data* rd = list_entry(list_pop_front(&cur->child_ret_list),struct ret_data, elem);
+        free(rd);
+      }
+
+      file_close(cur->self_elf);
+
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -222,6 +351,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&file_lock);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -313,6 +443,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  lock_release(&file_lock);
   return success;
 }
 

@@ -37,6 +37,8 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+// /* Lock used by files specifically. */
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -71,6 +73,17 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+struct thread*
+get_thread_by_tid(tid_t tid){
+  struct list_elem* e;
+  for(e = list_begin(&all_list);e!=list_end(&all_list);e=list_next(e)){
+    struct thread* t = list_entry(e, struct thread, allelem);
+    if (t->tid == tid) 
+      return t;
+  }
+  return NULL;
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -90,6 +103,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+  lock_init(&file_lock);
   list_init (&ready_list);
   list_init (&all_list);
 
@@ -462,6 +476,29 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  t->ret_status = 0;
+  t->save_ret = false;
+  t->self_elf = NULL;
+  t->load_status = false;
+  sema_init(&t->sema_wait,0);
+  sema_init(&t->load_wait,0);
+  
+  
+  //added by lh
+  list_init(&(t->open_file_list));
+  list_init(&(t->child_ret_list));
+  t->open_file_num = 0;
+  t->max_fd = 2;
+  t->is_wait = false;
+  if (t == initial_thread){
+    t->parent = NULL;
+  }
+  else{
+    t->parent = thread_current();
+  }
+  //added by lh
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
