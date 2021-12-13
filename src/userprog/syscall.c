@@ -295,7 +295,7 @@ sys_close(struct intr_frame *f)
   } 
 }
 
-// the following functions are unused in proj2
+// proj3
 void sys_mmap(struct intr_frame *f UNUSED){
   printf("sys_mmap");
 }
@@ -303,6 +303,7 @@ void sys_munmap(struct intr_frame *f UNUSED){
   printf("sys_munmap");
 }
 
+//proj4
 void sys_chdir(struct intr_frame *f UNUSED){
   printf("sys_chdir");
 }
