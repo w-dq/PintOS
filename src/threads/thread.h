@@ -113,7 +113,8 @@ struct thread
     bool is_wait;                        /* true if the thread is waited by parent thread */
     bool save_ret;                       /* true if thread has save return value to parent thread */
     /*for proj2*/
-
+    /* for proj4 */
+    // pagedir
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
