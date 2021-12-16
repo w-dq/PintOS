@@ -304,18 +304,41 @@ void sys_munmap(struct intr_frame *f UNUSED){
 }
 
 //proj4
-void sys_chdir(struct intr_frame *f UNUSED){
-  printf("sys_chdir");
+/* Change the current directory. */
+void 
+sys_chdir(struct intr_frame *f ){
+  if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
+  const char* dir = (const char*)*(int*)(f->esp+4);
+  f->eax = filesys_chdir(dir);
 }
-void sys_mkdir(struct intr_frame *f UNUSED){
-  printf("sys_mkdir");
+
+/* Create a directory. */
+void 
+sys_mkdir(struct intr_frame *f UNUSED){
+  if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
+  const char* dir = (const char*)*(int*)(f->esp+4);
+  f->eax = filesys_mkdir(dir);
 }
-void sys_readdir(struct intr_frame *f UNUSED){
-  printf("sys_readdir");
+
+/* Reads a directory entry. */
+void 
+sys_readdir(struct intr_frame *f UNUSED){
+  
 }
-void sys_isdir(struct intr_frame *f UNUSED){
-  printf("sys_isdir");
+
+/* Tests if a fd represents a directory. */
+void 
+sys_isdir(struct intr_frame *f UNUSED){
+  
 }
-void sys_inumber(struct intr_frame *f UNUSED){
-  printf("sys_inumber");
+
+/* Returns the inode number for a fd. */
+void 
+sys_inumber(struct intr_frame *f UNUSED){
+  
 }
+
+                 
+                
+                    
+                  
