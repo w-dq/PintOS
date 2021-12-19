@@ -4,7 +4,9 @@
 #include <list.h>
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/free-map.h"
 #include "threads/malloc.h"
+
 
 /* A directory. */
 struct dir 
@@ -23,10 +25,43 @@ struct dir_entry
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
-bool
-dir_create (block_sector_t sector, size_t entry_cnt)
+
+/* this function has been overwrite. */
+struct inode*
+dir_create (block_sector_t cur_sector, block_sector_t parent_sector)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  bool success = inode_create (cur_sector, 2 * sizeof(struct dir_entry),0);
+  // here consider "./" and "../"
+  struct inode* ind;
+  if (success){
+    ind = inode_open(cur_sector);
+    if (ind == NULL){
+      free_map_available_at(cur_sector);
+    }
+  }
+  if (ind){
+      struct dir_entry dir[2];
+
+      memset (dir, 0, sizeof(dir));
+
+      /* Deal with "." entry. */
+      dir[0].inode_sector = cur_sector;
+      strlcat (dir[0].name, ".", sizeof(dir[0].name));
+      dir[0].in_use = true;
+
+      /* Deal with ".." entry. */
+      dir[1].inode_sector = parent_sector;
+      strlcat (dir[1].name, "..", sizeof(dir[1].name));
+      dir[1].in_use = true;
+      off_t num_written_bytes = inode_write_at (ind, dir, sizeof(dir), 0);
+      if (num_written_bytes != sizeof(dir))
+        {
+          inode_remove (ind);
+          inode_close (ind); 
+          ind = NULL;
+        } 
+  }
+  return ind;
 }
 
 /* Opens and returns the directory for the given INODE, of which

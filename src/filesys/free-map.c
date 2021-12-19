@@ -7,7 +7,7 @@
 
 static struct file *free_map_file;   /* Free map file. */
 static struct bitmap *free_map;      /* Free map, one bit per sector. */
-
+static struct lock* free_map_lock;
 /* Initializes the free map. */
 void
 free_map_init (void) 
@@ -82,4 +82,12 @@ free_map_create (void)
     PANIC ("can't open free map");
   if (!bitmap_write (free_map, free_map_file))
     PANIC ("can't write free map");
+}
+
+void 
+free_map_available_at(block_sector_t sector){
+  lock_acquire (&free_map_lock);
+  ASSERT (bitmap_test (free_map, sector));
+  bitmap_reset (free_map, sector);
+  lock_release (&free_map_lock);
 }

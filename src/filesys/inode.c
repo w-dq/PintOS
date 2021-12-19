@@ -18,6 +18,9 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     uint32_t unused[125];               /* Not used. */
+    
+    // added 
+    uint32_t is_file;                   /* 1 if file, 0 if dir */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -70,7 +73,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, uint32_t is_file)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -87,6 +90,9 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      // added
+      disk_inode->is_file = is_file;
+
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           block_write (fs_device, sector, disk_inode);
