@@ -263,8 +263,8 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1], int order)
       dir->pos += sizeof e;
       // here check if it's . or ..
       if (((e.in_use) 
-          && (strcmp(name,'.') != 0) 
-          && (strcmp(name,'..') != 0)))
+          && (strcmp(e.name,'.') != 0) 
+          && (strcmp(e.name,'..') != 0)))
         {
           count++;
           if (count == order){
