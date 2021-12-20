@@ -4,6 +4,8 @@
         "sstream": "cpp",
         "free-map.h": "c",
         "process.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "block.h": "c",
+        "filesys.h": "c"
     }
 }

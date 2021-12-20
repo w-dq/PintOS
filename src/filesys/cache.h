@@ -10,14 +10,16 @@ struct cache_block{
     struct list_elem elem;                           /* list elem */
 
     int dirty;                                       /* if dirty dirty = 1, else dirty = 0 */
-    int refernce_bit;                                /* used for clock_algorithm */
+    int reference_bit;                                /* used for clock_algorithm. 1/0 */
     int occupied_count;                              /* number of being occupied */
 };
 
  /* cache in form of list */
 struct list cache;     
  /* the especial lock for cache */                             
-struct lock cache_lock;          
+struct lock cache_lock;    
+/* the size of cache list, it should be no greater than 64 */
+int cache_size;
 /* the amount of used cache blocks */                   
 int occuppied_cache_block_amount;                    
 
