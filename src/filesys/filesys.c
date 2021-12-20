@@ -136,7 +136,7 @@ filesys_chdir (const char* dir){
 }
 // added
 bool 
-filesys_mkdir (const char *dir){
+filesys_mkdir (const char* dir){
   if (strcmp(dir, "")==0){
     return false;
   }

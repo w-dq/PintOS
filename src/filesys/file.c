@@ -166,3 +166,8 @@ file_tell (struct file *file)
   ASSERT (file != NULL);
   return file->pos;
 }
+
+bool
+file_check(struct file* file){
+  return (file->inode->data.is_file==1);
+}

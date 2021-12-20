@@ -254,17 +254,23 @@ dir_remove (struct dir *dir, const char *name)
    NAME.  Returns true if successful, false if the directory
    contains no more entries. */
 bool
-dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
+dir_readdir (struct dir *dir, char name[NAME_MAX + 1], int order)
 {
   struct dir_entry e;
-
+  int count = 0;
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      // here check if it's . or ..
+      if (((e.in_use) 
+          && (strcmp(name,'.') != 0) 
+          && (strcmp(name,'..') != 0)))
         {
-          strlcpy (name, e.name, NAME_MAX + 1);
-          return true;
+          count++;
+          if (count == order){
+            strlcpy (name, e.name, NAME_MAX + 1);
+            return true;
+          }
         } 
     }
   return false;

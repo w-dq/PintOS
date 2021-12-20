@@ -11,6 +11,7 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 #include "userprog/process.h"
+#include "filesys/directory.h"
 
 
 
@@ -19,7 +20,7 @@ syscall_func syscalls[20];
 int max_files = 200;
 
 static void syscall_handler (struct intr_frame *);
-struct file_node * file_find(struct list *,int);
+// struct file_node * file_find(struct list *,int);
 void exit_ret(int);
 
 void 
@@ -176,6 +177,7 @@ sys_open_file(struct intr_frame *f)
     fn->f = open_file;
     thread_current()->max_fd++;    // next_handle == max_fd
     fn->fd =  thread_current()->max_fd;
+    fn->read_dir_cnt = 0;
     
     list_push_back(&(thread_current()->open_file_list),&(fn->elem));
     thread_current()->open_file_num ++;
@@ -306,7 +308,7 @@ void sys_munmap(struct intr_frame *f UNUSED){
 //proj4
 /* Change the current directory. */
 void 
-sys_chdir(struct intr_frame *f ){
+sys_chdir(struct intr_frame *f){
   if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
   const char* dir = (const char*)*(int*)(f->esp+4);
   f->eax = filesys_chdir(dir);
@@ -314,7 +316,7 @@ sys_chdir(struct intr_frame *f ){
 
 /* Create a directory. */
 void 
-sys_mkdir(struct intr_frame *f UNUSED){
+sys_mkdir(struct intr_frame *f){
   if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
   const char* dir = (const char*)*(int*)(f->esp+4);
   f->eax = filesys_mkdir(dir);
@@ -322,21 +324,47 @@ sys_mkdir(struct intr_frame *f UNUSED){
 
 /* Reads a directory entry. */
 void 
-sys_readdir(struct intr_frame *f UNUSED){
-  
+sys_readdir(struct intr_frame *f){
+  if (!is_user_vaddr(*(int*)(f->esp+8))) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  char* dir = (char*)*(int*)(f->esp+8);
+  struct file_node* fn = file_find(&thread_current()->open_file_list, fd);
+  if (fn!=NULL){
+    fn->read_dir_cnt ++;
+    if (file_check(fn->f)){
+      f->eax = false;
+    }
+    else{
+      f->eax = dir_readdir(dir_open(fn->f->inode), dir, fn->read_dir_cnt);
+    }
+  }
 }
 
 /* Tests if a fd represents a directory. */
 void 
-sys_isdir(struct intr_frame *f UNUSED){
-  
+sys_isdir(struct intr_frame *f){
+  if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  struct file_node* fn = file_find(&thread_current()->open_file_list, fd);
+  if (fn != NULL){
+    if (!file_check(fn->f)){
+      f->eax = true;
+      return;
+    }
+  }
+  f->eax = false;
 }
 
 /* Returns the inode number for a fd. */
 void 
 sys_inumber(struct intr_frame *f UNUSED){
-  
-}
+  if (!is_user_vaddr(*(int*)(f->esp+4))) exit_ret(-1);
+  int fd = *(int*)(f->esp+4);
+  struct file_node* fn = file_find(&thread_current()->open_file_list, fd);
+  if (fn != NULL){
+    f->eax = fn->f->inode->sector;
+  }
+}   
 
                  
                 

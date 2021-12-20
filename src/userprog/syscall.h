@@ -3,12 +3,13 @@
 
 #include "threads/interrupt.h"
 #include "lib/kernel/list.h"
+#include "filesys/file.h"
 
 struct file_node{
   int fd;                   /*file descriptor*/
   struct list_elem elem;    
   struct file* f;
-  // int read_dir_cnt;
+  int read_dir_cnt;
 };
 
 void exit_ret(int);
@@ -38,5 +39,6 @@ void sys_readdir(struct intr_frame *f );
 void sys_isdir(struct intr_frame *f );
 void sys_inumber(struct intr_frame *f );
 
+struct file_node* file_find(struct list *,int);
 
 #endif /* userprog/syscall.h */
