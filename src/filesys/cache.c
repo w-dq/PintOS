@@ -6,6 +6,8 @@
 #include "threads/thread.h"
 #include "devices/timer.h"
 
+static void block_set(struct cache_block*, block_sector_t, int, int, int);
+
 void 
 cache_init(void){
     lock_init(&cache_lock);
@@ -16,7 +18,7 @@ cache_init(void){
 /* if occupied_count_operation == 1, occupied_count ++. 
    if occupied_count_operation == 0, occupied_count = 0
    if occupied_count_operation > 1, occupied_count += occupied_count_operation */
-void 
+static void 
 block_set(struct cache_block* block, block_sector_t sector, 
           int dirty, int reference_bit, int occupied_count_operation){
     
@@ -50,10 +52,24 @@ seek_cache_block(block_sector_t sector){
 struct cache_block* 
 get_cache_block(block_sector_t sector, int dirty){
     lock_acquire(&cache_lock);
-    struct cache_block* block = get_cache_block(sector);
+    struct cache_block* block = seek_cache_block(sector);
     if (block!=NULL){
         block->occupied_count ++;
+        if (block->dirty == 0){
+            block->dirty = dirty;
+        }
+        block->reference_bit = 1;
+        lock_release(&cache_lock);
+        return block;
     }
+    else{
+        block = insert_cache_block(sector, dirty);
+        if (block!=NULL){
+            lock_release(&cache_lock);
+            return block;
+        }
+    }
+
 }
 /* insert a new cache block with "sector" and "dirty" */
 struct cache_block* 

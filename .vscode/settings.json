@@ -6,6 +6,9 @@
         "process.h": "c",
         "string.h": "c",
         "block.h": "c",
-        "filesys.h": "c"
+        "filesys.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }
