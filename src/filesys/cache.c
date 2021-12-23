@@ -6,35 +6,27 @@
 #include "threads/thread.h"
 #include "devices/timer.h"
 
-static void block_set(struct cache_block*, block_sector_t, int, int, int);
+/* initialize a newly allocated block */
+static void block_set(struct cache_block*, block_sector_t, int, int);
+/* cache write back every "period" time */ 
+void periodically_cache_write_back(int);
 
 void 
 cache_init(void){
     lock_init(&cache_lock);
     list_init(&cache);
-    cache_size = 0; //but it seems nowhere to increment it?
+    cache_size = 0;
     thread_create("filesys_cache_writeback", 0, periodically_cache_write_back, NULL); //???
 }
-/* if occupied_count_operation == 1, occupied_count ++. 
-   if occupied_count_operation == 0, occupied_count = 0
-   if occupied_count_operation > 1, occupied_count += occupied_count_operation */
+
+/* initalize cache block sector, getting data from the file disk */
 static void 
-block_set(struct cache_block* block, block_sector_t sector, 
-          int dirty, int reference_bit, int occupied_count_operation){
-    
+block_set(struct cache_block* block, block_sector_t sector, int dirty, int reference_bit){
     block->sector = sector;
     block_read(fs_device,block->sector, &block->block_data);
     block->dirty = dirty;
     block->reference_bit= reference_bit;
-    if (occupied_count_operation == 1){
-        block->occupied_count ++;
-    }
-    else if(occupied_count_operation == 0){
-        block->occupied_count = 0;
-    }
-    else if(occupied_count_operation > 1){
-        block->occupied_count += occupied_count_operation;
-    }
+    block->occupied = 1;
 }
 
 /* return the cache_block with sector = sector, return null if not in cache */
@@ -46,15 +38,30 @@ seek_cache_block(block_sector_t sector){
         block = list_entry(e, struct cache_block, elem);
         if (block->sector == sector) return block;
     }
-    return NULL;  // a little different with reference(v)
+    return NULL; /* no cache block found */
 } 
-/* TBD */
+
+/* UI to un-occupied */
+void release_cache_block(struct cache_block* cb){
+    lock_acquire(&cache_lock);
+    cb->occupied = (cb->occupied == 0 ? 0 : (cb->occupied - 1));
+    if ((cb->occupied == 0) && (cb->dirty == 1)){
+        block_write(fs_device, cb->sector, &cb->block_data);
+        cb->dirty = 0;
+    }
+    lock_release(&cache_lock);
+}
+
+/* UI for access to block sector, 
+   dirty = 0 -> read; dirty = 1 -> write 
+   returns the pointer to the cache block for operation */
 struct cache_block* 
 get_cache_block(block_sector_t sector, int dirty){
     lock_acquire(&cache_lock);
     struct cache_block* block = seek_cache_block(sector);
     if (block!=NULL){
-        block->occupied_count ++;
+        /* sector already cached */
+        block->occupied++;
         if (block->dirty == 0){
             block->dirty = dirty;
         }
@@ -63,23 +70,25 @@ get_cache_block(block_sector_t sector, int dirty){
         return block;
     }
     else{
+        /* sector not cached */
+        /* we need to cache this sector, evict old cache if need to*/
         block = insert_cache_block(sector, dirty);
         if (block!=NULL){
             lock_release(&cache_lock);
             return block;
         }
     }
-
 }
 /* insert a new cache block with "sector" and "dirty" */
+/* WARN: this has problem if all occupied, need to rethink*/
 struct cache_block* 
 insert_cache_block(block_sector_t sector, int dirty){
     struct cache_block* insert_block;
     struct cache_block* replace_block;
     struct list_elem* e;
     if (cache_size < 64){
+        /*if cache not full place the new sector directly */
         insert_block = malloc(sizeof(struct cache_block));
-        insert_block->occupied_count = 0;
         list_push_back(&cache, &insert_block->elem);
         cache_size ++;
     }
@@ -87,13 +96,16 @@ insert_cache_block(block_sector_t sector, int dirty){
         // choose a block to replace
         for(e = list_begin(&cache); e!=list_end(&cache); e = list_next(e)){
             replace_block = list_entry(e, struct cache_block, elem);
-            if (replace_block->occupied_count == 0){
+            if (replace_block->occupied == 0){
+                /* noone is using this block */
                 if (replace_block->reference_bit == 0){
+
                     if (replace_block->dirty == 1){
+                        /*write back to disk if dirty */
                         block_write(fs_device, replace_block->sector, &replace_block->block_data);
                     }
                     insert_block = replace_block;
-                    break; //added
+                    break;
                 }
                 else{
                     replace_block->reference_bit = 0;
@@ -101,9 +113,10 @@ insert_cache_block(block_sector_t sector, int dirty){
             }
         }
     }
-    block_set(insert_block, sector, dirty, 1, 1);
+    block_set(insert_block, sector, dirty, 1);
     return insert_block;
 }
+
 /* scan the whole cache, and write back dirty block to disk. 
 if if_flushed = 1, flush the whole cache, i.e. write back dirty + empty the cache */
 void 
@@ -124,7 +137,9 @@ scan_cache_write_back(int if_flushed){
     }
     lock_acquire(&cache_lock);
 }
+
 /* cache write back every "period" time */ 
+/* WARN: period is not right */
 void 
 periodically_cache_write_back(int period UNUSED){
     for (int i=INT32_MIN; i <INT32_MAX;i++)
@@ -133,4 +148,4 @@ periodically_cache_write_back(int period UNUSED){
         if (i <= 0) timer_sleep(-i);
         scan_cache_write_back(0);
     }
-}   
+}
