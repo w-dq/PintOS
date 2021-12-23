@@ -11,7 +11,7 @@ struct cache_block{
 
     int dirty;                                       /* if dirty dirty = 1, else dirty = 0 */
     int reference_bit;                               /* used for clock_algorithm. 1/0 */
-    int occupied;                                /* number of being occupied */
+    int occupied;                                    /* number of being occupied */
 };
 
  /* cache in form of list */
