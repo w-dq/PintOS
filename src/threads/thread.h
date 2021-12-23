@@ -114,7 +114,7 @@ struct thread
     bool save_ret;                       /* true if thread has save return value to parent thread */
     /*for proj2*/
     /* for proj4 */
-    struct dir* pagedir;                 /* the directory hold currently */
+    struct dir* cur_dir;                 /* the directory hold currently */
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

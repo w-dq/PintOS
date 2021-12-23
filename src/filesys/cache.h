@@ -10,7 +10,7 @@ struct cache_block{
     struct list_elem elem;                           /* list elem */
 
     int dirty;                                       /* if dirty dirty = 1, else dirty = 0 */
-    int reference_bit;                                /* used for clock_algorithm. 1/0 */
+    int reference_bit;                               /* used for clock_algorithm. 1/0 */
     int occupied_count;                              /* number of being occupied */
 };
 
@@ -26,11 +26,11 @@ int occuppied_cache_block_amount;
 /* initialize the cache in the beginning */
 void cache_init(void);                  
 /* return the cache_block with sector = sector, return null if not in cache */
-struct cache_block* seek_cache_block(block_sector_t sector);   
+// struct cache_block* seek_cache_block(block_sector_t sector);   inner use
 /* TBD */
 struct cache_block* get_cache_block(block_sector_t sector, int dirty);
 /* insert a new cache block with "sector" and "dirty" */
-struct cache_block* insert_cache_block(block_sector_t sector, int dirty);
+// struct cache_block* insert_cache_block(block_sector_t sector, int dirty); inner use
 /* scan the whole cache, and write back dirty block to disk. 
 if if_flushed = true, flush the whole cache, i.e. write back dirty + empty the cache */
 void scan_cache_write_back(int if_flushed);

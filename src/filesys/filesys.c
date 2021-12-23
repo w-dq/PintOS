@@ -129,8 +129,8 @@ bool
 filesys_chdir (const char* dir){
   struct dir *open_dir = dir_open(filepath_get_inode(dir));
   if (open_dir){
-    dir_close(thread_current()->pagedir);
-    thread_current()->pagedir = open_dir;
+    dir_close(thread_current()->cur_dir);
+    thread_current()->cur_dir = open_dir;
     return true;
   }
   else return false;
@@ -204,7 +204,6 @@ parse_fail(struct dir** dir, struct dir* dir_tmp, char base_name[NAME_MAX+1]){
    parse DIR_STR recursively based on '/' and save last file into base_name */
 static bool
 parse_dir(const char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
-  return;
   // /home/pintos/group07/src/filesys/directory.c 
   // -> open dir /home/pintos/group07/src/filesys/directory.c  
   // base_name = 'directory.c\0'
@@ -217,11 +216,11 @@ parse_dir(const char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   struct dir* dir_tmp;
   char* dir_str_tmp = dir_str;
   struct inode* ind;
-  if ((dir_str[0] == '/')||thread_current()->pagedir == NULL){
+  if ((dir_str[0] == '/')||thread_current()->cur_dir == NULL){
     dir_tmp = dir_open_root();
   }
   else{
-    dir_tmp = dir_reopen(thread_current()->pagedir);
+    dir_tmp = dir_reopen(thread_current()->cur_dir);
   }
 
   if ((dir_tmp == NULL)
