@@ -13,8 +13,11 @@
 struct block *fs_device;
 
 static void do_format (void);
-static bool parse_dir(const char* filepath, struct dir** dir, char base_name[NAME_MAX + 1]);
-static struct inode* filepath_get_inode(const char* filepath);
+static bool parse_dir(char*, struct dir**, char base_name[NAME_MAX + 1]);
+static struct inode* filepath_get_inode(const char*);
+static bool parse_fail(struct dir**, struct dir*, char base_name[NAME_MAX+1]);
+static int filename_get_this_point_next(char this[NAME_MAX + 1], char**);
+
 /* Initializes the file system module.
    If FORMAT is true, reformats the file system. */
 void
@@ -183,11 +186,15 @@ filepath_get_inode(const char* filepath){
    return 1 if success, return -1 if len(filename) > 14 */
 static int
 filename_get_this_point_next(char this[NAME_MAX + 1], char** next){
-  const char *ptr = *next;
+  char *ptr = *next;
   char *filename = this;
   while (*ptr == '/')
     ptr++;
-  if (*ptr == '\0') return 1;
+  if (*ptr == '\0') {
+    *next = ptr;
+    *filename = '\0';
+    return 1;
+  }
   while (*ptr != '/' && *ptr != '\0'){
     if (filename < this + NAME_MAX)
         *filename++ = *ptr;
@@ -213,7 +220,7 @@ parse_fail(struct dir** dir, struct dir* dir_tmp, char base_name[NAME_MAX+1]){
 /* create and open DIR 
    parse DIR_STR recursively based on '/' and save last file into base_name */
 static bool
-parse_dir(const char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
+parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   // /home/pintos/group07/src/filesys/directory.c 
   // -> open dir /home/pintos/group07/src/filesys/directory.c  
   // base_name = 'directory.c\0'
@@ -234,11 +241,11 @@ parse_dir(const char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   }
 
   if ((dir_tmp == NULL)
-    ||(!dir_tmp->inode->removed)){
+    ||(dir_tmp->inode->removed)){
     return parse_fail(dir,dir_tmp,base_name);
   }
-  /* after this step, SECOND hold the foremost filename and dir_str_tmp point to the next */
-  int success = filename_get_this_point_next(cur_file,dir_str_tmp);
+  /* after this step, cur_file hold the foremost filename and dir_str_tmp point to the next */
+  int success = filename_get_this_point_next(cur_file,&dir_str_tmp);
   
   // if it's the last one, we won't open the directory and just break
   while(success > 0){
@@ -273,7 +280,7 @@ do_format (void)
 {
   printf ("Formatting file system...");
   free_map_create ();
-  if (!dir_create (ROOT_DIR_SECTOR, 16))
+  if (!dir_create (ROOT_DIR_SECTOR, ROOT_DIR_SECTOR))
     PANIC ("root directory creation failed");
   free_map_close ();
   printf ("done.\n");

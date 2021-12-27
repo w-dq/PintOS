@@ -23,7 +23,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+static void record_ret(struct thread* t, int tid, int ret);
 struct ret_data{
   int tid;
   int ret;
@@ -185,7 +185,7 @@ process_wait (tid_t child_tid)
 }
 
 
-void
+static void
 record_ret(struct thread* t, int tid, int ret){
   struct ret_data* rd = (struct ret_data*)malloc(sizeof(struct ret_data));
   rd->tid = tid;

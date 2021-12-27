@@ -11,6 +11,8 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
+static void free_inode_disk(struct inode_disk*);
+static int sec_to_idx(size_t sec_num, int idx_type);
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -95,7 +97,7 @@ inode_create (block_sector_t sector, off_t length, uint32_t is_file)
     disk_inode->indirect_ptr2 = 0;
     disk_inode->doubly_ptr2 = 0;
     disk_inode->doubly_ptr3 = 0;
-    if(inode_extend(&disk_inode, length) == length){
+    if(inode_extend(disk_inode, length) == length){
       block_write(fs_device, sector, disk_inode);
       success = true;
     }
@@ -420,7 +422,8 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
     return target_length;
 }
 
-int sec_to_idx(size_t sec_num, int idx_type){
+static int 
+sec_to_idx(size_t sec_num, int idx_type){
   switch (idx_type){
     case 0: /* direct */
       return sec_num;
@@ -437,9 +440,11 @@ int sec_to_idx(size_t sec_num, int idx_type){
       return sec_num - INDIRECT_LENGTH - idx1 * 128;
     }
   }
+  return 0;
 }
 
-void free_inode_disk(struct inode_disk* inode_d){
+static void 
+free_inode_disk(struct inode_disk* inode_d){
   static uint32_t level1[128];
   static uint32_t level2[128];
 

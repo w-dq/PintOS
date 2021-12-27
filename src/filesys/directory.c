@@ -16,7 +16,7 @@ dir_create (block_sector_t cur_sector, block_sector_t parent_sector)
 {
   bool success = inode_create (cur_sector, 2 * sizeof(struct dir_entry),0);
   // here consider "./" and "../"
-  struct inode* ind;
+  struct inode* ind = NULL;
   if (success){
     ind = inode_open(cur_sector);
     if (ind == NULL){
@@ -242,13 +242,16 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1], int order)
 {
   struct dir_entry e;
   int count = 0;
+  char* cur = ".";
+  char* parent = "..";
+
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
       // here check if it's . or ..
       if (((e.in_use) 
-          && (strcmp(e.name,'.') != 0) 
-          && (strcmp(e.name,'..') != 0)))
+          && (strcmp(e.name,cur) != 0) 
+          && (strcmp(e.name,parent) != 0)))
         {
           count++;
           if (count == order){

@@ -168,7 +168,9 @@ file_create (block_sector_t sector, off_t length)
   if(inode_create (sector, length, 1)){
     inode = inode_open (sector);
     if (inode == NULL)
-      free_map_release(sector,1);
+      // free_map_release(sector,1);
+      free_map_available_at(sector);
+
   }
 
   // if (inode != NULL && length > 0

@@ -86,8 +86,8 @@ free_map_create (void)
 
 void 
 free_map_available_at(block_sector_t sector){
-  lock_acquire (&free_map_lock);
+  lock_acquire (free_map_lock);
   ASSERT (bitmap_test (free_map, sector));
   bitmap_reset (free_map, sector);
-  lock_release (&free_map_lock);
+  lock_release (free_map_lock);
 }
