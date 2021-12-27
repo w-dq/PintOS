@@ -22,8 +22,11 @@ fsutil_ls (char **argv UNUSED)
   dir = dir_open_root ();
   if (dir == NULL)
     PANIC ("root dir open failed");
-  while (dir_readdir (dir, name))
+  int order = 1;
+  while (dir_readdir (dir, name, order)){
     printf ("%s\n", name);
+    order++;
+  }
   dir_close (dir);
   printf ("End of listing.\n");
 }

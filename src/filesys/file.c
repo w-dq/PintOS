@@ -2,14 +2,7 @@
 #include <debug.h>
 #include "filesys/inode.h"
 #include "threads/malloc.h"
-
-/* An open file. */
-struct file 
-  {
-    struct inode *inode;        /* File's inode. */
-    off_t pos;                  /* Current position. */
-    bool deny_write;            /* Has file_deny_write() been called? */
-  };
+#include "free-map.h"
 
 /* Opens a file for the given INODE, of which it takes ownership,
    and returns the new file.  Returns a null pointer if an
@@ -165,6 +158,27 @@ file_tell (struct file *file)
 {
   ASSERT (file != NULL);
   return file->pos;
+}
+
+struct inode *
+file_create (block_sector_t sector, off_t length) 
+{
+  /* init the inode with NULL.*/
+  struct inode *inode = NULL;
+  if(inode_create (sector, length, 1)){
+    inode = inode_open (sector);
+    if (inode == NULL)
+      free_map_release(sector,1);
+  }
+
+  // if (inode != NULL && length > 0
+  //     && inode_write_at (inode, "", 1, length - 1) != 1)
+  //   {
+  //     inode_remove (inode);
+  //     inode_close (inode);
+  //     inode = NULL;
+  //   }
+  return inode;
 }
 
 bool

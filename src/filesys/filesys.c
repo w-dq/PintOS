@@ -26,7 +26,7 @@ filesys_init (bool format)
 
   inode_init ();
   free_map_init ();
-  cache_init();
+  // cache_init();
   if (format) 
     do_format ();
 
@@ -38,7 +38,7 @@ filesys_init (bool format)
 void
 filesys_done (void) 
 {
-  scan_cache_write_back(true);
+  // scan_cache_write_back(true);
   free_map_close ();
 }
 
@@ -49,14 +49,25 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size) 
 {
-  block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
-  bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size)
-                  && dir_add (dir, name, inode_sector));
-  if (!success && inode_sector != 0) 
-    free_map_release (inode_sector, 1);
+  block_sector_t inode_sector;
+  struct dir *dir;
+  char base_name[NAME_MAX + 1];
+
+  bool success = (parse_dir(name,&dir,base_name)
+                  && free_map_allocate (1, &inode_sector));
+  if (success){
+    struct inode *inode;
+    inode = file_create (inode_sector, initial_size); 
+    if (inode != NULL) {
+      success = dir_add (dir, base_name, inode_sector);
+      if (!success)
+        inode_remove (inode);
+      inode_close (inode);
+    }
+    else{
+      success = false;
+    }
+  }
   dir_close (dir);
 
   return success;
@@ -67,28 +78,27 @@ bool
 filesys_create_dir(const char* name){
   struct dir *dir;
   char base_name[NAME_MAX + 1];
-  block_sector_t inode_sector;  // new mallocate sector space to store new dir
+  block_sector_t inode_sector;
 
   if (parse_dir(name, &dir, base_name)
       && free_map_allocate(1, &inode_sector)){
-    struct inode *ind;
-    ind = dir_create(inode_sector,inode_get_inumber(dir_get_inode (dir))); 
-    if (ind){
+    struct inode* inode;
+    inode = dir_create(inode_sector,dir->inode->sector); 
+    if (inode){
       if (!dir_add(dir, base_name, inode_sector)){
-        inode_remove (ind);
-        inode_close (ind);
+        inode_remove (inode);
+        inode_close (inode);
         dir_close (dir);
         return false;
       }
        
       dir_close (dir);
       return true;
-    }
-    else
+    } else {
       dir_close (dir);
-      return false;    
-  }
-  else{
+      return false;
+    }
+  } else {
     dir_close(dir);
     return false;
   }

@@ -7,22 +7,6 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 
-
-/* A directory. */
-struct dir 
-  {
-    struct inode *inode;                /* Backing store. */
-    off_t pos;                          /* Current position. */
-  };
-
-/* A single directory entry. */
-struct dir_entry 
-  {
-    block_sector_t inode_sector;        /* Sector number of header. */
-    char name[NAME_MAX + 1];            /* Null terminated file name. */
-    bool in_use;                        /* In use or free? */
-  };
-
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 
@@ -53,13 +37,13 @@ dir_create (block_sector_t cur_sector, block_sector_t parent_sector)
       dir[1].inode_sector = parent_sector;
       strlcat (dir[1].name, "..", sizeof(dir[1].name));
       dir[1].in_use = true;
+
       off_t num_written_bytes = inode_write_at (ind, dir, sizeof(dir), 0);
-      if (num_written_bytes != sizeof(dir))
-        {
-          inode_remove (ind);
-          inode_close (ind); 
-          ind = NULL;
-        } 
+      if (num_written_bytes != sizeof(dir)){
+        inode_remove (ind);
+        inode_close (ind); 
+        ind = NULL;
+      } 
   }
   return ind;
 }

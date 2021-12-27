@@ -10,6 +10,7 @@
 static void block_set(struct cache_block*, block_sector_t, int, int);
 /* cache write back every "period" time */ 
 void periodically_cache_write_back(int);
+struct cache_block* insert_cache_block(block_sector_t , int );
 
 void 
 cache_init(void){

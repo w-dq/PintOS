@@ -2,6 +2,8 @@
 #define FILESYS_INODE_H
 
 #include <stdbool.h>
+#include "list.h"
+#include "threads/synch.h"
 #include "filesys/off_t.h"
 #include "devices/block.h"
 
@@ -70,5 +72,6 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
+off_t inode_extend(struct inode_disk *, off_t );
 
 #endif /* filesys/inode.h */

@@ -6,6 +6,14 @@
 
 struct inode;
 
+/* An open file. */
+struct file 
+  {
+    struct inode *inode;        /* File's inode. */
+    off_t pos;                  /* Current position. */
+    bool deny_write;            /* Has file_deny_write() been called? */
+  };
+
 /* Opening and closing files. */
 struct file *file_open (struct inode *);
 struct file *file_reopen (struct file *);
@@ -28,5 +36,5 @@ off_t file_tell (struct file *);
 off_t file_length (struct file *);
 
 bool file_check(struct file* file);
-
+struct inode *file_create (block_sector_t sector, off_t length);
 #endif /* filesys/file.h */
