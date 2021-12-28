@@ -57,7 +57,8 @@ filesys_create (const char *name, off_t initial_size)
   char base_name[NAME_MAX + 1];
 
   bool success = (parse_dir(name,&dir,base_name)
-                  && free_map_allocate (1, &inode_sector));
+                  && free_map_allocate (1, &inode_sector)); 
+  // if success == 1, it should be file, not directory
   if (success){
     struct inode *inode;
     inode = file_create (inode_sector, initial_size); 
@@ -114,14 +115,24 @@ filesys_create_dir(const char* name){
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
-  struct inode *inode = NULL;
-
-  if (dir != NULL)
-    dir_lookup (dir, name, &inode);
-  dir_close (dir);
-
-  return file_open (inode);
+  if ((name[0] == '/')&&(name[1] == '\0')){
+    return file_open(inode_open(ROOT_DIR_SECTOR));
+  }
+  else{
+    struct dir *dir;
+    struct inode *inode = NULL;
+    char base_name[NAME_MAX+1];
+    bool success = parse_dir(name, &dir, base_name);
+    if (success){
+      success = dir_lookup (dir, name, &inode);
+      dir_close (dir);
+      return file_open (inode);
+    }
+    else{
+      return NULL;
+    }
+  }
+  
 }
 
 /* Deletes the file named NAME.
@@ -246,7 +257,9 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   }
   /* after this step, cur_file hold the foremost filename and dir_str_tmp point to the next */
   int success = filename_get_this_point_next(cur_file,&dir_str_tmp);
-  
+  if (success < 0){
+        return parse_fail(dir,dir_tmp,base_name);  
+  }
   // if it's the last one, we won't open the directory and just break 
   if (*dir_str_tmp != '\0'){
     while(success > 0){
