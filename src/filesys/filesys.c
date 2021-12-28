@@ -124,9 +124,14 @@ filesys_open (const char *name)
     char base_name[NAME_MAX+1];
     bool success = parse_dir(name, &dir, base_name);
     if (success){
-      success = dir_lookup (dir, name, &inode);
+      success = dir_lookup (dir, base_name, &inode);
       dir_close (dir);
-      return file_open (inode);
+      if (success){
+        return file_open (inode);
+      }else{
+        return NULL;
+      }
+
     }
     else{
       return NULL;
