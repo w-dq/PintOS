@@ -258,7 +258,7 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   /* after this step, cur_file hold the foremost filename and dir_str_tmp point to the next */
   int success = filename_get_this_point_next(cur_file,&dir_str_tmp);
   if (success < 0){
-        return parse_fail(dir,dir_tmp,base_name);  
+    return parse_fail(dir,dir_tmp,base_name);  
   }
   // if it's the last one, we won't open the directory and just break 
   if (*dir_str_tmp != '\0'){
@@ -273,15 +273,13 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
         ||(!dir_tmp->inode->removed)){
         return parse_fail(dir,dir_tmp,base_name);
       }
-      // if it is the last one, end the loop.
-      if (*dir_str_tmp == '\0') break;
-
       success = filename_get_this_point_next(cur_file, &dir_str_tmp);
-      
       // if LEN(CUR_FILE) > MAX_NAME, parse failed.
       if (success < 0){
         return parse_fail(dir,dir_tmp,base_name);  
       }
+      // if it is the last one, end the loop.
+      if (*dir_str_tmp == '\0') break;
     }
   }
   *dir = dir_tmp;
