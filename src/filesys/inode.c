@@ -7,6 +7,7 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/cache.h"
+#include "filesys/directory.h"
 #include "threads/synch.h"
 
 /* Identifies an inode. */
@@ -297,6 +298,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         block = malloc (BLOCK_SECTOR_SIZE);
         if (block == NULL) break;
       }
+      block_read (fs_device, sector_idx, block);
+      
       memcpy (block + sector_ofs, buffer + bytes_written, chunk_size);
       block_write (fs_device, sector_idx, block);
 

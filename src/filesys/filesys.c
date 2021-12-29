@@ -147,11 +147,18 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
+  // struct dir *dir = dir_open_root ();
+  // bool success = dir != NULL && dir_remove (dir, name);
+  // dir_close (dir); 
+
+  // return success;
+  struct dir *dir;
+  char base_name[NAME_MAX + 1];
+  bool success = parse_dir(name,&dir,base_name)&&dir_remove(dir, base_name);
   dir_close (dir); 
 
   return success;
+
 }
 // added
 bool
