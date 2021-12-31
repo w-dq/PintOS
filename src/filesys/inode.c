@@ -33,22 +33,33 @@ byte_to_sector (const struct inode *inode, off_t pos)
   ASSERT (inode != NULL);
 
   if (pos < inode->data.length) {
+    /* if position is valid */
     if (pos < LENGTH_PASS_DIRECT) {
+      /* offset still in the direct region */
+      /* notice LENGTH_PASS_DIRECT is not DIRECT_LENGTH*/
       return inode->data.direct[pos / BLOCK_SECTOR_SIZE];
     } else if (pos < LENGTH_PASS_INDIRECT){
+      /* offest is in inderect range */
       uint32_t idx1,idx2;
       uint32_t indirect_table[128];
+      /* idx1 represents which indrect page */
       idx1 = (pos - LENGTH_PASS_DIRECT) / (BLOCK_SECTOR_SIZE * 128);
+      /* idx2 represents which entry in the indirect page */
       idx2 = (pos - LENGTH_PASS_DIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
+      /* load the indirect table first */
       block_read(fs_device,inode->data.indirect[idx1],indirect_table);
       return indirect_table[idx2];
     } else {
+      /* is using the doubly indirect*/
       uint32_t idx1,idx2;
       uint32_t doubly_indirect[128];
+      /* idx1 is the positon on the first level of indirection */
       idx1 = (pos - LENGTH_PASS_INDIRECT) / (BLOCK_SECTOR_SIZE * 128);
+      /* idx2 represents which entry in the second level of indirection page */
       idx2 = (pos - LENGTH_PASS_INDIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
-
+      /* first load the doubly indirect table */
       block_read(fs_device,inode->data.doubly_indirect,doubly_indirect);
+      /* then load the second level of indirection page */
       block_read(fs_device,doubly_indirect[idx1],doubly_indirect);
       return doubly_indirect[idx2];
     }
@@ -91,7 +102,7 @@ inode_create (block_sector_t sector, off_t length, uint32_t is_file)
     disk_inode->magic = INODE_MAGIC;
     /* is_file indication */
     disk_inode->is_file = is_file;
-    /*initalize as zero then extend to the target length */
+    /* initalize as zero then extend to the target length */
     disk_inode->length = 0;
     disk_inode->direct_ptr = 0;
     disk_inode->indirect_ptr1 = 0;
@@ -298,6 +309,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         block = malloc (BLOCK_SECTOR_SIZE);
         if (block == NULL) break;
       }
+      /* have to read the current operating block before writing to an offset */
       block_read (fs_device, sector_idx, block);
       
       memcpy (block + sector_ofs, buffer + bytes_written, chunk_size);
@@ -349,15 +361,26 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
     static char zeros[BLOCK_SECTOR_SIZE];
     static uint32_t level1[128];
     static uint32_t level2[128];
+
+    /* make sure that it is a proper extend */
+    if (target_length < inode_d->length) return -1;
+
+    /* number of new sectors to allocate
+       not that new_sectors doesn't mean that the length is not extended */
     size_t new_sectors = bytes_to_sectors (target_length) - bytes_to_sectors(inode_d->length);
 
-    if (new_sectors == 0) return target_length;
+    if (new_sectors == 0) {
+      inode_d->length = target_length;
+      return target_length;
+    }
 
     /* initialize level1 and level2 if half-way done*/
     if (inode_d->doubly_ptr3 != 0) {
-      /* doubl-indirect already in-use */
+      /* doubly-indirect already in-use */
+      /* read the doubly-indirect table first */
       block_read(fs_device, inode_d->doubly_indirect,level1);
-      block_read(fs_device, level1[inode_d->doubly_ptr3],level2);
+      /* read the second level doubly-indirect table first*/
+      block_read(fs_device, level1[inode_d->doubly_ptr2],level2);
     } else if (inode_d->indirect_ptr2 != 0) {
       /* indirect already in-use */
       block_read(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
@@ -375,6 +398,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
       } else if (inode_d->indirect_ptr1 < INDIRECT_LENGTH) {
         /* need to put in indirect table*/
         if(inode_d->indirect_ptr2 < 128){
+          /* level1 is either read initially or blank */
           success = free_map_allocate(1, &level1[inode_d->indirect_ptr2]);
           if(!success) return 0;
           block_write(fs_device, level1[inode_d->indirect_ptr2], zeros);
@@ -414,7 +438,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
     if (inode_d->doubly_ptr3 != 0) {
       /* doubl-indirect already in-use */
       block_write(fs_device,inode_d->doubly_indirect,level1);
-      block_write(fs_device,level1[inode_d->doubly_ptr3],level2);
+      block_write(fs_device,level1[inode_d->doubly_ptr2],level2);
     } else if (inode_d->indirect_ptr2 != 0) {
       /* indirect already in-use */
       block_write(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
@@ -425,6 +449,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
     return target_length;
 }
 
+/* function that turns sector numbers to level index */
 static int 
 sec_to_idx(size_t sec_num, int idx_type){
   switch (idx_type){
@@ -443,21 +468,26 @@ sec_to_idx(size_t sec_num, int idx_type){
       return sec_num - INDIRECT_LENGTH - idx1 * 128;
     }
   }
-  return 0;
+  return -1; /*error*/
 }
 
+/* free inode disk by the direct / indirect / doubly-indirect structure */
 static void 
 free_inode_disk(struct inode_disk* inode_d){
   static uint32_t level1[128];
   static uint32_t level2[128];
-
+  /* number of sectors to free and freed */
   size_t sec_to_free = bytes_to_sectors(inode_d->length);
   size_t sec_freed = 0;
   while (sec_freed < sec_to_free){
     if (sec_freed < DIRECT_LENGTH){
+      /* in the direct region */
       free_map_release(inode_d->direct[sec_to_idx(sec_freed,0)],1);
       sec_freed++;
     } else if (sec_freed < INDIRECT_LENGTH){
+      /* in the indirect region */
+      /* idx1 means the first level of indirection 
+         idx2 is the entry number of the data sector */
       uint32_t idx1 = sec_to_idx(sec_freed,1);
       uint32_t idx2 = sec_to_idx(sec_freed,2);
       block_read(fs_device, inode_d->indirect[idx1], level1);
@@ -465,29 +495,35 @@ free_inode_disk(struct inode_disk* inode_d){
         free_map_release(level1[i],1);
         sec_freed++;
       }
+      /* release level of indirection */
       free_map_release(inode_d->indirect[idx1],1);
     } else {
-      uint32_t idx3 = sec_to_idx(sec_freed,3);
+      /* in the doubly-indirect region */
       block_read(fs_device, inode_d->doubly_indirect, level1);
 
-      uint32_t idx4 = sec_to_idx(sec_freed,4);
+      /* idx3 is the entry number for the first level of indirection */
+      uint32_t idx3 = sec_to_idx(sec_freed,3);
       for (uint8_t j = 0; j < idx3; j++)
       {
+        /* for every first level indirection release fully */
         block_read(fs_device, level1[j], level2);
         for(uint8_t i=0; i < 128; i++){
           free_map_release(level2[i],1);
           sec_freed++;
         }
+        /* release level of indirection */
         free_map_release(level1[j], 1);
       }
-
+      /* for last level-1, which may not be full */
       block_read(fs_device, level1[idx3], level2);
+      uint32_t idx4 = sec_to_idx(sec_freed,4);
       for(uint8_t i=0; i < idx4; i++){
         free_map_release(level2[i],1);
         sec_freed++;
       }
+      /* release level of indirection */
       free_map_release(level1[idx3], 1);
-
+      /* release doubly indirection */
       free_map_release(inode_d->doubly_indirect, 1);
     }
   }
