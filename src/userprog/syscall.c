@@ -171,9 +171,13 @@ sys_open_file(struct intr_frame *f)
   lock_acquire(&file_lock);
   struct file* open_file = filesys_open(file_name); 
   lock_release(&file_lock);
-  if (open_file && (thread_current()->open_file_num < max_files)){
+  if (open_file){
     /* file node create when open file successfully. */
     struct file_node* fn = (struct file_node*)malloc(sizeof(struct file_node));
+    if (fn == NULL){
+      f->eax = -1;
+      return;
+    }
     fn->f = open_file;
     thread_current()->max_fd++;    // next_handle == max_fd
     fn->fd =  thread_current()->max_fd;

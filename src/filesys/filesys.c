@@ -80,7 +80,7 @@ filesys_create (const char *name, off_t initial_size)
 // need further check
 bool
 filesys_create_dir(const char* name){
-  struct dir *dir;
+  struct dir *dir = NULL;
   char base_name[NAME_MAX + 1];
   block_sector_t inode_sector;
 
@@ -88,24 +88,20 @@ filesys_create_dir(const char* name){
       && free_map_allocate(1, &inode_sector)){
     struct inode* inode;
     inode = dir_create(inode_sector,dir->inode->sector); 
-    if (inode){
+    if (inode != NULL){
       if (!dir_add(dir, base_name, inode_sector)){
         inode_remove (inode);
         inode_close (inode);
         dir_close (dir);
         return false;
-      }
-       
+      }  
+      inode_close (inode);
       dir_close (dir);
       return true;
-    } else {
-      dir_close (dir);
-      return false;
     }
-  } else {
-    dir_close(dir);
-    return false;
   }
+  dir_close(dir);
+  return false;
 }
 /* Opens the file with the given NAME.
    Returns the new file if successful or a null pointer
@@ -113,7 +109,7 @@ filesys_create_dir(const char* name){
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *
-filesys_open (const char *name)
+filesys_open (const char *name) // if name = '.'
 {
   if ((name[0] == '/')&&(name[1] == '\0')){
     return file_open(inode_open(ROOT_DIR_SECTOR));
@@ -166,7 +162,6 @@ filesys_remove (const char *name)
   struct dir *dir;
   struct dir* dir_tmp;
   char base_name[NAME_MAX + 1];
-  struct inode* ind;
   if (!able_to_remove(name)) return false;
   bool success = parse_dir(name,&dir,base_name)&&dir_remove(dir, base_name);
   dir_close (dir); 
@@ -176,7 +171,9 @@ filesys_remove (const char *name)
 // added
 bool
 filesys_chdir (const char* dir){
-  struct dir *open_dir = dir_open(filepath_get_inode(dir));
+  struct inode* ind = filepath_get_inode(dir);
+  if (ind == NULL) return false;
+  struct dir *open_dir = dir_open(ind);
   if (open_dir){
     dir_close(thread_current()->cur_dir);
     thread_current()->cur_dir = open_dir;
@@ -198,7 +195,7 @@ filesys_mkdir (const char* dir){
 static struct inode*
 filepath_get_inode(const char* filepath){
   struct inode* ind;
-  if (filepath[0] == '/' && filepath[strspn (filepath, "/")] == '\0'){
+  if ((filepath[0] == '/') && (filepath[strspn (filepath, "/")] == '\0')){
     return inode_open (ROOT_DIR_SECTOR);
   }
   else 

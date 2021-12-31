@@ -33,42 +33,58 @@ test_main (void)
       snprintf (file_name, sizeof file_name, "file%d", i);
       if (!create (file_name, 0))
         break;
+      printf("create file%d. \n",i);
       CHECK ((fd = open (file_name)) > 1, "open \"%s\"", file_name);
+      printf("open file%d. \n",i);
       snprintf (contents, sizeof contents, "contents %d\n", i);
       if (write (fd, contents, strlen (contents)) != (int) strlen (contents)) 
-        {
+        { 
+          printf("write file%d failed. \n",i);
           CHECK (remove (file_name), "remove \"%s\"", file_name);
           close (fd);
           break;
         }
+        printf("write file%d . \n",i);
       close (fd);
       
       /* Create directory. */
       snprintf (dir_name, sizeof dir_name, "dir%d", i);
       if (!mkdir (dir_name)) 
         {
+          printf("create directory file%d failed. \n",i);
           CHECK (remove (file_name), "remove \"%s\"", file_name);
           break; 
         }
-
+      printf("mkdir file%d . \n",i);
+      
       /* Check for file and directory. */
+      printf("0000");
       CHECK ((fd = open (".")) > 1, "open \".\"");
+      printf("1");
       CHECK (readdir (fd, name[0]), "readdir \".\"");
+      printf("2");
       CHECK (readdir (fd, name[1]), "readdir \".\"");
+      printf("3");
       CHECK (!readdir (fd, name[2]), "readdir \".\" (should fail)");
+      printf("4");
       CHECK ((!strcmp (name[0], dir_name) && !strcmp (name[1], file_name))
              || (!strcmp (name[1], dir_name) && !strcmp (name[0], file_name)),
              "names should be \"%s\" and \"%s\", "
              "actually \"%s\" and \"%s\"",
              file_name, dir_name, name[0], name[1]);
+      
       close (fd);
-
+      printf("names should be \"%s\" and \"%s\", "
+             "actually \"%s\" and \"%s\"\n",
+             file_name, dir_name, name[0], name[1]);
       /* Descend into directory. */
       CHECK (chdir (dir_name), "chdir \"%s\"", dir_name);
+      printf("chdir file%d .dirname:%s. \n",i,dir_name);
     }
+  printf("finish the first loop");
   CHECK (i > 200, "created files and directories only to level %d", i);
   quiet = false;
-
+  printf("check i>200, %d",i);
   msg ("removing all but top 10 levels of files and directories...");
   quiet = true;
   while (i-- > 10) 
