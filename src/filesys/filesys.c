@@ -147,18 +147,12 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  // struct dir *dir = dir_open_root ();
-  // bool success = dir != NULL && dir_remove (dir, name);
-  // dir_close (dir); 
-
-  // return success;
   struct dir *dir;
   char base_name[NAME_MAX + 1];
   bool success = parse_dir(name,&dir,base_name)&&dir_remove(dir, base_name);
   dir_close (dir); 
 
   return success;
-
 }
 // added
 bool
@@ -252,7 +246,6 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
   // base_name = 'filesys\0'
 
   char cur_file[NAME_MAX+1];
-  // char second[NAME_MAX+1];
   struct dir* dir_tmp;
   char* dir_str_tmp = dir_str;
   struct inode* ind;
@@ -282,7 +275,7 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
 
       dir_tmp = dir_open(ind);
       if ((dir_tmp == NULL)
-        ||(!dir_tmp->inode->removed)){
+        ||(dir_tmp->inode->removed)){
         return parse_fail(dir,dir_tmp,base_name);
       }
       success = filename_get_this_point_next(cur_file, &dir_str_tmp);

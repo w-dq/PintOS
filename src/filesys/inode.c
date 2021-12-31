@@ -455,11 +455,11 @@ free_inode_disk(struct inode_disk* inode_d){
   size_t sec_freed = 0;
   while (sec_freed < sec_to_free){
     if (sec_freed < DIRECT_LENGTH){
-      free_map_release(inode_d->direct[sec_to_idx(sec_to_free,0)],1);
+      free_map_release(inode_d->direct[sec_to_idx(sec_freed,0)],1);
       sec_freed++;
     } else if (sec_freed < INDIRECT_LENGTH){
-      uint32_t idx1 = sec_to_idx(sec_to_free,1);
-      uint32_t idx2 = sec_to_idx(sec_to_free,2);
+      uint32_t idx1 = sec_to_idx(sec_freed,1);
+      uint32_t idx2 = sec_to_idx(sec_freed,2);
       block_read(fs_device, inode_d->indirect[idx1], level1);
       for(uint8_t i=0; i < idx2; i++){
         free_map_release(level1[i],1);
@@ -467,10 +467,10 @@ free_inode_disk(struct inode_disk* inode_d){
       }
       free_map_release(inode_d->indirect[idx1],1);
     } else {
-      uint32_t idx3 = sec_to_idx(sec_to_free,3);
+      uint32_t idx3 = sec_to_idx(sec_freed,3);
       block_read(fs_device, inode_d->doubly_indirect, level1);
 
-      uint32_t idx4 = sec_to_idx(sec_to_free,4);
+      uint32_t idx4 = sec_to_idx(sec_freed,4);
       for (uint8_t j = 0; j < idx3; j++)
       {
         block_read(fs_device, level1[j], level2);

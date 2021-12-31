@@ -6,6 +6,7 @@
 #include "filesys/inode.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
@@ -116,17 +117,21 @@ lookup (const struct dir *dir, const char *name,
   
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+  // printf("\n\n====================");
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) 
+       ofs += sizeof e) {
+    // printf("\n[%s]\n",e.name);
     if (e.in_use && !strcmp (name, e.name)) 
       {
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
           *ofsp = ofs;
+        // printf("==true=============\n");
         return true;
       }
+  }
+  // printf("==false=============\n");
   return false;
 }
 
@@ -197,6 +202,20 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   return success;
 }
 
+static  bool
+is_dir_parent(struct dir *dir)
+{
+  struct dir_entry e;
+  size_t ofs;
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e) {
+        //  printf("\n [%s] %d %d \n",e.name, e.inode_sector, thread_current()->cur_dir->inode->sector);
+      if(e.inode_sector == thread_current()->cur_dir->inode->sector)
+        return true;
+  }
+  return false;
+}
+
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */
@@ -220,14 +239,19 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  // if (is_dir_parent(dir_open(inode))){
+  //   success = false;
+  // } else {
   /* Erase directory entry. */
-  e.in_use = false;
-  if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
-    goto done;
+    e.in_use = false;
+    if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
+      goto done;
 
   /* Remove inode. */
-  inode_remove (inode);
-  success = true;
+  
+    inode_remove (inode);
+    success = true;
+  // }
 
  done:
   inode_close (inode);
