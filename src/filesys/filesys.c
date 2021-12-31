@@ -139,16 +139,35 @@ filesys_open (const char *name)
   }
   
 }
+static bool
+able_to_remove(const char* name){
+  struct file* file_open = filesys_open(name);
+  if (file_check(file_open)) 
+    return true;
 
+  struct dir* dir = dir_open(file_open->inode);
+  if ((dir==NULL)||(dir_hold_children(dir))){
+    dir_close(dir);
+    return false;
+  }
+  else{
+    dir_close(dir);
+    return true;
+  }
+
+}
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) 
-{
+{// "/a"
   struct dir *dir;
+  struct dir* dir_tmp;
   char base_name[NAME_MAX + 1];
+  struct inode* ind;
+  if (!able_to_remove(name)) return false;
   bool success = parse_dir(name,&dir,base_name)&&dir_remove(dir, base_name);
   dir_close (dir); 
 

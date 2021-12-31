@@ -215,6 +215,19 @@ is_dir_parent(struct dir *dir)
   }
   return false;
 }
+bool
+dir_hold_children(struct dir *dir)
+{
+  struct dir_entry e;
+  size_t ofs;
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e) {
+      if ((e.in_use)&& (strcmp(e.name,".")!= 0) 
+          && (strcmp(e.name,"..") != 0))
+        return true;
+  }
+  return false;
+}
 
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
