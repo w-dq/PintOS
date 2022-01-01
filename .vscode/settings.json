@@ -12,7 +12,9 @@
         "string_view": "c",
         "malloc.h": "c",
         "off_t.h": "c",
-        "cache.h": "c"
+        "cache.h": "c",
+        "initializer_list": "c",
+        "utility": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

@@ -19,16 +19,14 @@ struct list cache;
  /* the especial lock for cache */                             
 struct lock cache_lock;    
 /* the size of cache list, it should be no greater than 64 */
-int cache_size;
-/* the amount of used cache blocks */                   
-int occuppied_cache_block_amount;                    
+int cache_size;                 
 
 /* initialize the cache in the beginning */
-void cache_init(void);                  
-/* get a cache block */
-struct cache_block* get_cache_block(block_sector_t, int);
-/* release a cache block*/
-void release_cache_block(struct cache_block*);
+void cache_init(void);          
+
+void cache_block_read (struct block *, block_sector_t , void *);
+
+void cache_block_write (struct block *, block_sector_t , const void *);
 
 /* scan the whole cache, and write back dirty block to disk. 
 if if_flushed = true, flush the whole cache, i.e. write back dirty + empty the cache */

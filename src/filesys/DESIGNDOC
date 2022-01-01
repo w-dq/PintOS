@@ -4,12 +4,17 @@
              |     DESIGN DOCUMENT     |
              +-------------------------+
 
----- GROUP 07----
+---- GROUP 07 ----
 
 >> Fill in the names and email addresses of your group members.
 
 Han Lin <linhan@shanghaitech.edu.cn>
 Daqian Wu <wudq1@shanghaitech.edu.cn>
+
+INDEXED AND EXTENSIBLE FILES            : mainly Daqian
+SUBDIRECTORIES                          : mainly Han
+BUFFER CACHE(internal implementation)   : Han
+BUFFER CACHE(external user interface)   : Daqian
 
 ---- PRELIMINARIES ----
 
@@ -222,17 +227,15 @@ struct list cache;
 struct lock cache_lock;    
 /* the size of cache list, it should be no greater than 64 */
 int cache_size;
-/* the amount of used cache blocks */                   
-int occuppied_cache_block_amount;
 
 ---- ALGORITHMS ----
 
 >> C2: Describe how your cache replacement algorithm chooses a cache
 >> block to evict.
 
-<!-- We try to choose th first unoccupied block to evict while writing back to block
-and reseting it's occupency. If all is occupied, we choose in a round-robin
-fashion since wo already reseted the occupency. -->
+We use the clock_algorithm to implement our eviction. Each cache block has a reference_bit
+initialized to one, and will be set to zero in the first round of traversal. We only choose the
+blocks that has zero reference and occupence.
 
 >> C3: Describe your implementation of write-behind.
 
@@ -258,6 +261,9 @@ are only allowed to be evicted when they are not occupied.
 >> C6: During the eviction of a block from the cache, how are other
 >> processes prevented from attempting to access the block?
 
+We have a cache_lock implemented to protect atomic operations such as occupy, unoccupy,
+and flushing. When a block a cache is being evicted, other process will have to wait to 
+acquire the cache_lock only to find that the block has already been evicted.
 
 
 ---- RATIONALE ----

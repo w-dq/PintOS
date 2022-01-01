@@ -48,7 +48,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
       /* idx2 represents which entry in the indirect page */
       idx2 = (pos - LENGTH_PASS_DIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
       /* load the indirect table first */
-      block_read(fs_device,inode->data.indirect[idx1],indirect_table);
+      cache_block_read(fs_device,inode->data.indirect[idx1],indirect_table);
       return indirect_table[idx2];
     } else {
       /* is using the doubly indirect*/
@@ -59,9 +59,9 @@ byte_to_sector (const struct inode *inode, off_t pos)
       /* idx2 represents which entry in the second level of indirection page */
       idx2 = (pos - LENGTH_PASS_INDIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
       /* first load the doubly indirect table */
-      block_read(fs_device,inode->data.doubly_indirect,doubly_indirect);
+      cache_block_read(fs_device,inode->data.doubly_indirect,doubly_indirect);
       /* then load the second level of indirection page */
-      block_read(fs_device,doubly_indirect[idx1],doubly_indirect);
+      cache_block_read(fs_device,doubly_indirect[idx1],doubly_indirect);
       return doubly_indirect[idx2];
     }
   } else {
@@ -110,12 +110,13 @@ inode_create (block_sector_t sector, off_t length, uint32_t is_file)
     disk_inode->indirect_ptr2 = 0;
     disk_inode->doubly_ptr2 = 0;
     disk_inode->doubly_ptr3 = 0;
-    if(inode_extend(disk_inode, length) == length){
-      block_write(fs_device, sector, disk_inode);
+    if(inode_extend(disk_inode, length) == length){    
+      cache_block_write(fs_device, sector, disk_inode);
       success = true;
     }
     free (disk_inode);
   }
+  
   return success;
 }
 
@@ -152,7 +153,7 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
   
-  block_read (fs_device, inode->sector, &inode->data);
+  cache_block_read (fs_device, inode->sector, &inode->data);
   lock_init(&inode->extend_lock);
   inode->length = inode->data.length;
   inode->length_for_read = inode->data.length;
@@ -244,7 +245,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         block = malloc(BLOCK_SECTOR_SIZE);
         if (block == NULL) break;
       }
-      block_read (fs_device, sector_idx, block);
+      cache_block_read (fs_device, sector_idx, block);
       memcpy (buffer + bytes_have_read, block + sector_ofs, chunk_size);
       
       /* Advance. */
@@ -280,7 +281,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
     inode->length = inode_extend(&inode->data, offset + size);
     inode->data.length = inode->length;
-    block_write(fs_device, inode->sector, &inode->data);
+    cache_block_write(fs_device, inode->sector, &inode->data);
 
     if (inode->data.is_file){
       lock_release(&inode->extend_lock);
@@ -308,10 +309,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         if (block == NULL) break;
       }
       /* have to read the current operating block before writing to an offset */
-      block_read (fs_device, sector_idx, block);
-      
+      cache_block_read (fs_device, sector_idx, block);
+
       memcpy (block + sector_ofs, buffer + bytes_written, chunk_size);
-      block_write (fs_device, sector_idx, block);
+      cache_block_write (fs_device, sector_idx, block);
 
       /* Advance. */
       size -= chunk_size;
@@ -376,12 +377,12 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
     if (inode_d->doubly_ptr3 != 0) {
       /* doubly-indirect already in-use */
       /* read the doubly-indirect table first */
-      block_read(fs_device, inode_d->doubly_indirect,level1);
+      cache_block_read(fs_device, inode_d->doubly_indirect,level1);
       /* read the second level doubly-indirect table first*/
-      block_read(fs_device, level1[inode_d->doubly_ptr2],level2);
+      cache_block_read(fs_device, level1[inode_d->doubly_ptr2],level2);
     } else if (inode_d->indirect_ptr2 != 0) {
       /* indirect already in-use */
-      block_read(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
+      cache_block_read(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
     }
 
     /* bear in mind that ptr always points to to next sector to right */
@@ -390,7 +391,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
         /* direct table */
         success = free_map_allocate(1, &inode_d->direct[inode_d->direct_ptr]);
         if(!success) return 0;
-        block_write(fs_device, inode_d->direct[inode_d->direct_ptr], zeros);
+        cache_block_write(fs_device, inode_d->direct[inode_d->direct_ptr], zeros);
         inode_d->direct_ptr++;
         new_sectors--;
       } else if (inode_d->indirect_ptr1 < INDIRECT_LENGTH) {
@@ -399,7 +400,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
           /* level1 is either read initially or blank */
           success = free_map_allocate(1, &level1[inode_d->indirect_ptr2]);
           if(!success) return 0;
-          block_write(fs_device, level1[inode_d->indirect_ptr2], zeros);
+          cache_block_write(fs_device, level1[inode_d->indirect_ptr2], zeros);
           inode_d->indirect_ptr2++;
           new_sectors--;
         }
@@ -407,7 +408,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
           /* level1 full, move to next indrect table */
           success = free_map_allocate(1, &inode_d->indirect[inode_d->indirect_ptr1]);
           if(!success) return 0;
-          block_write(fs_device, inode_d->indirect[inode_d->indirect_ptr1], level1);
+          cache_block_write(fs_device, inode_d->indirect[inode_d->indirect_ptr1], level1);
           inode_d->indirect_ptr1++;
           inode_d->indirect_ptr2 = 0;
         }
@@ -415,7 +416,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
         if (inode_d->doubly_ptr3 < 128){
           success = free_map_allocate(1, &level2[inode_d->doubly_ptr3]);
           if(!success) return 0;
-          block_write(fs_device, level2[inode_d->doubly_ptr3], zeros);
+          cache_block_write(fs_device, level2[inode_d->doubly_ptr3], zeros);
           inode_d->doubly_ptr3++;
           new_sectors--;
         }
@@ -423,7 +424,7 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
           /* level2 full, move to next double-indrect table */
           success = free_map_allocate(1, &level1[inode_d->doubly_ptr2]);
           if(!success) return 0;
-          block_write(fs_device, level1[inode_d->doubly_ptr2], level2);
+          cache_block_write(fs_device, level1[inode_d->doubly_ptr2], level2);
           inode_d->doubly_ptr2++;
           inode_d->doubly_ptr3 = 0;
         } 
@@ -431,18 +432,31 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
           return false;
       }
     }
-
+    
     /* write back unfinished level one and level two */
     if (inode_d->doubly_ptr3 != 0) {
       /* doubl-indirect already in-use */
-      block_write(fs_device,inode_d->doubly_indirect,level1);
-      block_write(fs_device,level1[inode_d->doubly_ptr2],level2);
+      if(level1[inode_d->doubly_ptr2]==0){
+        success = free_map_allocate(1, &level1[inode_d->doubly_ptr2]);
+        if(!success) return 0;
+      }
+      cache_block_write(fs_device,level1[inode_d->doubly_ptr2],level2);
+      if(inode_d->doubly_indirect==0){
+        success = free_map_allocate(1, &inode_d->doubly_indirect);
+        if(!success) return 0;
+      }
+      cache_block_write(fs_device,inode_d->doubly_indirect,level1);
     } else if (inode_d->indirect_ptr2 != 0) {
       /* indirect already in-use */
-      block_write(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
+      if(inode_d->indirect[inode_d->indirect_ptr1]==0){
+        success = free_map_allocate(1, &inode_d->indirect[inode_d->indirect_ptr1]);
+        if(!success) return 0;
+      }
+      cache_block_write(fs_device, inode_d->indirect[inode_d->indirect_ptr1],level1);
     }
-
+    
     /* WARN: if failed, should extend at all? */
+    
     inode_d->length = target_length;
     return target_length;
 }
@@ -488,7 +502,7 @@ free_inode_disk(struct inode_disk* inode_d){
          idx2 is the entry number of the data sector */
       uint32_t idx1 = sec_to_idx(sec_freed,1);
       uint32_t idx2 = sec_to_idx(sec_freed,2);
-      block_read(fs_device, inode_d->indirect[idx1], level1);
+      cache_block_read(fs_device, inode_d->indirect[idx1], level1);
       for(uint8_t i=0; i < idx2; i++){
         free_map_release(level1[i],1);
         sec_freed++;
@@ -497,14 +511,14 @@ free_inode_disk(struct inode_disk* inode_d){
       free_map_release(inode_d->indirect[idx1],1);
     } else {
       /* in the doubly-indirect region */
-      block_read(fs_device, inode_d->doubly_indirect, level1);
+      cache_block_read(fs_device, inode_d->doubly_indirect, level1);
 
       /* idx3 is the entry number for the first level of indirection */
       uint32_t idx3 = sec_to_idx(sec_freed,3);
       for (uint8_t j = 0; j < idx3; j++)
       {
         /* for every first level indirection release fully */
-        block_read(fs_device, level1[j], level2);
+        cache_block_read(fs_device, level1[j], level2);
         for(uint8_t i=0; i < 128; i++){
           free_map_release(level2[i],1);
           sec_freed++;
@@ -513,7 +527,7 @@ free_inode_disk(struct inode_disk* inode_d){
         free_map_release(level1[j], 1);
       }
       /* for last level-1, which may not be full */
-      block_read(fs_device, level1[idx3], level2);
+      cache_block_read(fs_device, level1[idx3], level2);
       uint32_t idx4 = sec_to_idx(sec_freed,4);
       for(uint8_t i=0; i < idx4; i++){
         free_map_release(level2[i],1);
