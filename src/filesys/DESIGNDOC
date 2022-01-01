@@ -29,13 +29,71 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+/* number of direct tables */
+#define DIRECT_LENGTH           (100)
+/* length of bytes to pass the direct tables */
+#define LENGTH_PASS_DIRECT      (DIRECT_LENGTH*BLOCK_SECTOR_SIZE)
+
+/* number of indirect tables */
+#define INDIRECT_LENGTH         (10)
+/* length of bytes to pass the indirect tables */
+#define LENGTH_PASS_INDIRECT    (LENGTH_PASS_DIRECT + 128\*BLOCK_SECTOR_SIZE\*DIRECT_LENGTH)
+
+/* length unused */
+#define LENGTH_UNUSED           (128 - 9 - DIRECT_LENGTH - INDIRECT_LENGTH)
+
+struct inode_disk
+{
+    off_t length;                       /* 1: File size in bytes. */
+    unsigned magic;                     /* 2: Magic number. */
+    uint32_t is_file;                   /* 3: 1 if file, 0 if dir */
+    uint32_t direct_ptr;                /* 4: index of the direct list */
+    uint32_t indirect_ptr1;             /* 5: index of the level 1 indrect table */
+    uint32_t indirect_ptr2;             /* 6: index of the level 2 indrect table */
+    /* doubly only need two level since only one doubly_indirect */
+    uint32_t doubly_ptr2;               /* 7: index of the level 2 doubly table */
+    uint32_t doubly_ptr3;               /* 8: index of the level 3 doubly table */
+
+    /* direct */
+    block_sector_t direct[DIRECT_LENGTH];
+    /* indirect */
+    block_sector_t indirect[INDIRECT_LENGTH];
+    /* doubly_indirect */
+    block_sector_t doubly_indirect;     /* 9 */
+
+    uint32_t unused[LENGTH_UNUSED];               /* Not used. */
+};
+
+/* In-memory inode. */
+struct inode 
+{
+    struct list_elem elem;              /* Element in inode list. */
+    block_sector_t sector;              /* Sector number of disk location. */
+    int open_cnt;                       /* Number of openers. */
+    bool removed;                       /* True if deleted, false otherwise. */
+    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+    struct inode_disk data;             /* Inode content. */
+
+    //added
+    struct lock extend_lock;            /* for file extention lock */
+    off_t length_for_read;              /* calculate the file size to read in bytes */
+    off_t length;                       /* the file size in bytes */
+};
+
 >> A2: What is the maximum size of a file supported by your inode
 >> structure?  Show your work.
+
+number of sectors = 100 + 10 * 128 + 128 * 128 = 17764
+maximum size = 17764 * 512 = 9095168 B
+roughly less than 8.7 MB
 
 ---- SYNCHRONIZATION ----
 
 >> A3: Explain how your code avoids a race if two processes attempt to
 >> extend a file at the same time.
+
+There is an extend_lock to prevent this, whichever process hold this lock
+can extend the file. 
 
 >> A4: Suppose processes A and B both have file F open, both
 >> positioned at end-of-file.  If A reads and B writes F at the same
@@ -44,12 +102,22 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> nonzero data, A is not allowed to see all zeros.  Explain how your
 >> code avoids this race.
 
+In our design, directly writing to the file is locked. So, if A reads first
+A will not be allowed to see anything written by B, B can only push this data
+to the file after A. If B writes first, A can only read the whole data of what 
+B written after it is finished.
+
+
 >> A5: Explain how your synchronization design provides "fairness".
 >> File access is "fair" if readers cannot indefinitely block writers
 >> or vice versa.  That is, many processes reading from a file cannot
 >> prevent forever another process from writing the file, and many
 >> processes writing to a file cannot prevent another process forever
 >> from reading the file.
+
+By not distinguishing read and wrties, our synchronization scheme provides 
+as much fairness as the thread scheduler, perations are delt with in the 
+chronological order they are queued. 
 
 ---- RATIONALE ----
 
@@ -58,6 +126,11 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> indirect blocks?  If not, why did you choose an alternative inode
 >> structure, and what advantages and disadvantages does your
 >> structure have, compared to a multilevel index?
+
+It is multilevel index. The demand was a system that supports files upto 8MB. 
+After calculation, a doubly-indirect would be enough. However, since more direct 
+tables would speed uo the access to files, we offered most spaces to direct, and
+the rest to indirect.
 
                 SUBDIRECTORIES
                 ==============
@@ -68,10 +141,30 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct dir 
+{
+    struct inode *inode;                /* Backing store. */
+    off_t pos;                          /* Current position. */
+};
+
+struct dir_entry 
+{
+    block_sector_t inode_sector;        /* Sector number of header. */
+    char name[NAME_MAX + 1];            /* Null terminated file name. */
+    bool in_use;                        /* In use or free */
+};
+
 ---- ALGORITHMS ----
 
 >> B2: Describe your code for traversing a user-specified path.  How
 >> do traversals of absolute and relative paths differ?
+
+We identify absolute if it begins with '/'. 
+For relative paths, we open the current directory from thread structure.
+For absolute paths, the traversing is done while parsing the paths until 
+the last file in the paths. Each cycle, there is a temp dir to open the dir
+currently parsed to. On each level of directory, we then try to find the next
+level recieved from the parser and on it, then update the temp dir and move on.
 
 ---- SYNCHRONIZATION ----
 
@@ -80,15 +173,29 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> should succeed, as should only one of two simultaneous attempts to
 >> create a file with the same name, and so on.
 
+An lock for the filesystem would prevent such actions. When two processes 
+try to delete an entry, the first will execute dir_remove normally, when 
+the second process acquire the lock, it won't be able to find the file to
+remove. When two threads try to create a file with the same name, the first 
+will create the file normally and the second thread will acquire the directory 
+lock, see that something by thatname already exists, and return without 
+re-adding the file.
+
 >> B5: Does your implementation allow a directory to be removed if it
 >> is open by a process or if it is in use as a process's current
 >> working directory?  If so, what happens to that process's future
 >> file system operations?  If not, how do you prevent it?
 
+No, we have an open_cnt, that prevent the directory to be removed if open_cnt
+is non-zero.
+
 ---- RATIONALE ----
 
 >> B6: Explain why you chose to represent the current directory of a
 >> process the way you did.
+
+The current directory belongs to an attribute of the thread thus we put it in
+the stucture of thread. 
 
                  BUFFER CACHE
                  ============
@@ -99,14 +206,44 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct cache_block{
+    uint8_t block_data[BLOCK_SECTOR_SIZE];           /* data from disk */
+    block_sector_t sector;                           /* sector index on disk */
+    struct list_elem elem;                           /* list elem */
+
+    int dirty;                                       /* if dirty dirty = 1, else dirty = 0 */
+    int reference_bit;                               /* used for clock_algorithm. 1/0 */
+    int occupied;                                    /* number of being occupied */
+};
+
+ /* cache in form of list */
+struct list cache;     
+ /* the especial lock for cache */                             
+struct lock cache_lock;    
+/* the size of cache list, it should be no greater than 64 */
+int cache_size;
+/* the amount of used cache blocks */                   
+int occuppied_cache_block_amount;
+
 ---- ALGORITHMS ----
 
 >> C2: Describe how your cache replacement algorithm chooses a cache
 >> block to evict.
 
+<!-- We try to choose th first unoccupied block to evict while writing back to block
+and reseting it's occupency. If all is occupied, we choose in a round-robin
+fashion since wo already reseted the occupency. -->
+
 >> C3: Describe your implementation of write-behind.
 
+We keep dirty blocks in the cache, instead of immediately writing modified
+data to disk.  Write dirty blocks to disk whenever they are evicted. Moreover,
+we periordically flushes the cache to prevent fragile cause by crashes
+
 >> C4: Describe your implementation of read-ahead.
+
+We automatically fetch the next block of a file into the cache when one block 
+of a file is read, in case that block is about to be read.
 
 ---- SYNCHRONIZATION ----
 
@@ -114,13 +251,23 @@ Daqian Wu <wudq1@shanghaitech.edu.cn>
 >> buffer cache block, how are other processes prevented from evicting
 >> that block?
 
+Since block concurrency already supports concurrency, so there is no need to
+lock an entry directly. We simply count the number of access occupied, and blocks
+are only allowed to be evicted when they are not occupied.
+
 >> C6: During the eviction of a block from the cache, how are other
 >> processes prevented from attempting to access the block?
+
+
 
 ---- RATIONALE ----
 
 >> C7: Describe a file workload likely to benefit from buffer caching,
 >> and workloads likely to benefit from read-ahead and write-behind.
+
+Frequent read and writes to files will benefit from buffer caching. Consecutive 
+and sequentially access and writes will esspecially benefit from 
+read-ahead and write-behind.
 
                SURVEY QUESTIONS
                ================
@@ -134,8 +281,13 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+The difficulty is okay, but more description on persistence testing and tar
+would be appreciated.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+Yes, learning inode structures was interesting and insightful.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
