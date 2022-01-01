@@ -11,7 +11,8 @@
         "string": "c",
         "string_view": "c",
         "malloc.h": "c",
-        "off_t.h": "c"
+        "off_t.h": "c",
+        "cache.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

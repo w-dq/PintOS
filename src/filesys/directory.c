@@ -118,9 +118,12 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
   // printf("\n\n====================");
+  // if(strcmp(name,"..")==0){
+  //       printf("\n!!!!!!\n");
+  // }
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) {
-    // printf("\n[%s]\n",e.name);
+   // printf("\n[%s]\n",e.name);
     if (e.in_use && !strcmp (name, e.name)) 
       {
         if (ep != NULL)

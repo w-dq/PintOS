@@ -17,7 +17,7 @@
 
 typedef void (*syscall_func)(struct intr_frame * UNUSED);
 syscall_func syscalls[20];
-int max_files = 200;
+int max_files = 400;
 
 static void syscall_handler (struct intr_frame *);
 // struct file_node * file_find(struct list *,int);

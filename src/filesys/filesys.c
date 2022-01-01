@@ -177,6 +177,16 @@ filesys_chdir (const char* dir){
   if (open_dir){
     dir_close(thread_current()->cur_dir);
     thread_current()->cur_dir = open_dir;
+    // if (strcmp(dir,"..")==0){
+    //   struct dir_entry e;
+    //   size_t ofs;
+    //   printf("\n====================");
+    //   for (ofs = 0; inode_read_at (open_dir->inode, &e, sizeof e, ofs) == sizeof e;
+    //       ofs += sizeof e) {
+    //     printf("\n[%s]\n",e.name);
+    //   }
+    //   printf("====================\n");
+    // }
     return true;
   }
   else return false;

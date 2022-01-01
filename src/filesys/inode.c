@@ -15,6 +15,9 @@
 static void free_inode_disk(struct inode_disk*);
 static int sec_to_idx(size_t sec_num, int idx_type);
 
+#define MAX_INODES 480
+static int inode_count = 0;
+
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
 static inline size_t
@@ -96,6 +99,10 @@ inode_create (block_sector_t sector, off_t length, uint32_t is_file)
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
 
+  if(inode_count >= MAX_INODES){
+    return success;
+  }
+
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
   { 
@@ -111,6 +118,7 @@ inode_create (block_sector_t sector, off_t length, uint32_t is_file)
     disk_inode->doubly_ptr3 = 0;
     if(inode_extend(disk_inode, length) == length){
       block_write(fs_device, sector, disk_inode);
+      inode_count++;
       success = true;
     }
     free (disk_inode);
@@ -206,6 +214,7 @@ inode_close (struct inode *inode)
 void
 inode_remove (struct inode *inode) 
 {
+  inode_count--;
   ASSERT (inode != NULL);
   inode->removed = true;
 }
