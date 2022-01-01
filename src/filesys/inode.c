@@ -46,7 +46,8 @@ byte_to_sector (const struct inode *inode, off_t pos)
       /* idx1 represents which indrect page */
       idx1 = (pos - LENGTH_PASS_DIRECT) / (BLOCK_SECTOR_SIZE * 128);
       /* idx2 represents which entry in the indirect page */
-      idx2 = (pos - LENGTH_PASS_DIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
+      idx2 = (pos - LENGTH_PASS_DIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE)
+              / BLOCK_SECTOR_SIZE;
       /* load the indirect table first */
       cache_block_read(fs_device,inode->data.indirect[idx1],indirect_table);
       return indirect_table[idx2];
@@ -57,7 +58,8 @@ byte_to_sector (const struct inode *inode, off_t pos)
       /* idx1 is the positon on the first level of indirection */
       idx1 = (pos - LENGTH_PASS_INDIRECT) / (BLOCK_SECTOR_SIZE * 128);
       /* idx2 represents which entry in the second level of indirection page */
-      idx2 = (pos - LENGTH_PASS_INDIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) / BLOCK_SECTOR_SIZE;
+      idx2 = (pos - LENGTH_PASS_INDIRECT - idx1 * 128 * BLOCK_SECTOR_SIZE) 
+              / BLOCK_SECTOR_SIZE;
       /* first load the doubly indirect table */
       cache_block_read(fs_device,inode->data.doubly_indirect,doubly_indirect);
       /* then load the second level of indirection page */
@@ -366,7 +368,8 @@ off_t inode_extend(struct inode_disk *inode_d, off_t target_length){
 
     /* number of new sectors to allocate
        not that new_sectors doesn't mean that the length is not extended */
-    size_t new_sectors = bytes_to_sectors (target_length) - bytes_to_sectors(inode_d->length);
+    size_t new_sectors = bytes_to_sectors (target_length) 
+                         - bytes_to_sectors(inode_d->length);
 
     if (new_sectors == 0) {
       inode_d->length = target_length;

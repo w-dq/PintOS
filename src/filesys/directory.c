@@ -13,10 +13,10 @@
 
 /* this function has been overwrite. */
 struct inode*
-dir_create (block_sector_t cur_sector, block_sector_t parent_sector)
+dir_create (block_sector_t cur_sector,
+            block_sector_t parent_sector)
 {
   bool success = inode_create (cur_sector, 2 * sizeof(struct dir_entry),0);
-  // here consider "./" and "../"
   struct inode* ind = NULL;
   if (success){
     ind = inode_open(cur_sector);
@@ -29,17 +29,16 @@ dir_create (block_sector_t cur_sector, block_sector_t parent_sector)
 
       memset (dir, 0, sizeof(dir));
 
-      /* Deal with "." entry. */
       dir[0].inode_sector = cur_sector;
       strlcat (dir[0].name, ".", sizeof(dir[0].name));
       dir[0].in_use = true;
 
-      /* Deal with ".." entry. */
       dir[1].inode_sector = parent_sector;
       strlcat (dir[1].name, "..", sizeof(dir[1].name));
       dir[1].in_use = true;
 
-      off_t num_written_bytes = inode_write_at (ind, dir, sizeof(dir), 0);
+      off_t num_written_bytes =
+           inode_write_at (ind, dir, sizeof(dir), 0);
       if (num_written_bytes != sizeof(dir)){
         inode_remove (ind);
         inode_close (ind); 
@@ -117,10 +116,7 @@ lookup (const struct dir *dir, const char *name,
   
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-  // printf("\n\n====================");
-  // if(strcmp(name,"..")==0){
-  //       printf("\n!!!!!!\n");
-  // }
+
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) {
     if (e.in_use && !strcmp (name, e.name)) 
@@ -202,19 +198,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   return success;
 }
 
-static  bool
-is_dir_parent(struct dir *dir)
-{
-  struct dir_entry e;
-  size_t ofs;
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) {
-        //  printf("\n [%s] %d %d \n",e.name, e.inode_sector, thread_current()->cur_dir->inode->sector);
-      if(e.inode_sector == thread_current()->cur_dir->inode->sector)
-        return true;
-  }
-  return false;
-}
 bool
 dir_hold_children(struct dir *dir)
 {
@@ -252,10 +235,6 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  // if (is_dir_parent(dir_open(inode))){
-  //   success = false;
-  // } else {
-  /* Erase directory entry. */
     e.in_use = false;
     if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
       goto done;
@@ -264,7 +243,6 @@ dir_remove (struct dir *dir, const char *name)
   
     inode_remove (inode);
     success = true;
-  // }
 
  done:
   inode_close (inode);
@@ -285,7 +263,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1], int order)
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      // here check if it's . or ..
       if (((e.in_use) 
           && (strcmp(e.name,cur) != 0) 
           && (strcmp(e.name,parent) != 0)))

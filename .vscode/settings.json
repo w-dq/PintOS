@@ -14,7 +14,10 @@
         "off_t.h": "c",
         "cache.h": "c",
         "initializer_list": "c",
-        "utility": "c"
+        "utility": "c",
+        "file.h": "c",
+        "thread.h": "c",
+        "inode.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

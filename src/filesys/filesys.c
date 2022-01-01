@@ -43,8 +43,6 @@ filesys_done (void)
 {
   scan_cache_write_back(true);
   free_map_close ();
-  free_map_open ();
-  free_map_close ();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
@@ -60,7 +58,7 @@ filesys_create (const char *name, off_t initial_size)
 
   bool success = (parse_dir(name,&dir,base_name)
                   && free_map_allocate (1, &inode_sector)); 
-  // if success == 1, it should be file, not directory
+  
   if (success){
     struct inode *inode;
     inode = file_create (inode_sector, initial_size); 
@@ -78,8 +76,7 @@ filesys_create (const char *name, off_t initial_size)
 
   return success;
 }
-// added
-// need further check
+
 bool
 filesys_create_dir(const char* name){
   struct dir *dir = NULL;
@@ -111,7 +108,7 @@ filesys_create_dir(const char* name){
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *
-filesys_open (const char *name) // if name = '.'
+filesys_open (const char *name) 
 {
   if ((name[0] == '/')&&(name[1] == '\0')){
     return file_open(inode_open(ROOT_DIR_SECTOR));
@@ -160,7 +157,7 @@ able_to_remove(const char* name){
    or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) 
-{// "/a"
+{
   struct dir *dir;
   struct dir* dir_tmp;
   char base_name[NAME_MAX + 1];
@@ -170,7 +167,7 @@ filesys_remove (const char *name)
 
   return success;
 }
-// added
+
 bool
 filesys_chdir (const char* dir){
   struct inode* ind = filepath_get_inode(dir);
@@ -184,7 +181,7 @@ filesys_chdir (const char* dir){
   }
   else return false;
 }
-// added
+
 bool 
 filesys_mkdir (const char* dir){
   if (strcmp(dir, "")==0){
@@ -194,7 +191,7 @@ filesys_mkdir (const char* dir){
     return filesys_create_dir(dir);
   }
 }
-// added
+
 static struct inode*
 filepath_get_inode(const char* filepath){
   struct inode* ind;
@@ -220,7 +217,7 @@ filepath_get_inode(const char* filepath){
       
   }
 }
-// added
+
 /* NEXT: the location of the pointer to the first char, 
           is updated to the next filename(exclude /) after the function 
    THIS[NAME_MAX+1]: hold the first filename from NEXT 
@@ -244,7 +241,7 @@ filename_get_this_point_next(char this[NAME_MAX + 1], char** next){
     ptr++; 
   }
   *filename = '\0';
-/* Advance source pointer. */
+
   while (*ptr == '/')
     ptr++;
   *next = ptr;
@@ -258,18 +255,11 @@ parse_fail(struct dir** dir, struct dir* dir_tmp, char base_name[NAME_MAX+1]){
   base_name[0] = '\0';
   return false;
 }
-// added
+
 /* create and open DIR 
    parse DIR_STR recursively based on '/' and save last file into base_name */
 static bool
 parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
-  // /home/pintos/group07/src/filesys/directory.c 
-  // -> open dir /home/pintos/group07/src/filesys/directory.c  
-  // base_name = 'directory.c\0'
-  // /home/pintos/group07/src/filesys/directory/
-  // -> open dir /home/pintos/group07/src/filesys/directory/ 
-  // base_name = 'filesys\0'
-
   char cur_file[NAME_MAX+1];
   struct dir* dir_tmp;
   char* dir_str_tmp = dir_str;
@@ -285,12 +275,12 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
     ||(dir_tmp->inode->removed)){
     return parse_fail(dir,dir_tmp,base_name);
   }
-  /* after this step, cur_file hold the foremost filename and dir_str_tmp point to the next */
+
   int success = filename_get_this_point_next(cur_file,&dir_str_tmp);
   if (success < 0){
     return parse_fail(dir,dir_tmp,base_name);  
   }
-  // if it's the last one, we won't open the directory and just break 
+  
   if (*dir_str_tmp != '\0'){
     while(success > 0){
       if (!dir_lookup(dir_tmp, cur_file, &ind)){
@@ -304,11 +294,11 @@ parse_dir(char* dir_str, struct dir** dir, char base_name[NAME_MAX + 1]){
         return parse_fail(dir,dir_tmp,base_name);
       }
       success = filename_get_this_point_next(cur_file, &dir_str_tmp);
-      // if LEN(CUR_FILE) > MAX_NAME, parse failed.
+      
       if (success < 0){
         return parse_fail(dir,dir_tmp,base_name);  
       }
-      // if it is the last one, end the loop.
+     
       if (*dir_str_tmp == '\0') break;
     }
   }

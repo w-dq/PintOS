@@ -19,12 +19,15 @@ cache_init(void){
     lock_init(&cache_lock);
     list_init(&cache);
     cache_size = 0;
-    thread_create("filesys_cache_writeback", 0, periodically_cache_write_back, NULL); //???
+    thread_create("filesys_cache_writeback",
+                  0, periodically_cache_write_back, NULL);
 }
 
 /* initalize cache block sector, getting data from the file disk */
 static void 
-block_initalize(struct cache_block* block, block_sector_t sector, int dirty, int reference_bit){
+block_initalize(struct cache_block* block,
+                block_sector_t sector, 
+                int dirty, int reference_bit){
     block->sector = sector;
     block_read(fs_device,block->sector, &block->block_data);
     block->dirty = dirty;
@@ -41,11 +44,12 @@ seek_cache_block(block_sector_t sector){
         block = list_entry(e, struct cache_block, elem);
         if (block->sector == sector) return block;
     }
-    return NULL; /* no cache block found */
+    return NULL; 
 } 
 
 /* UI to un-occupied */
-void release_cache_block(struct cache_block* cb){
+void 
+release_cache_block(struct cache_block* cb){
     lock_acquire(&cache_lock);
     cb->occupied = (cb->occupied == 0 ? 0 : (cb->occupied - 1));
     lock_release(&cache_lock);
@@ -96,16 +100,18 @@ insert_cache_block(block_sector_t sector, int dirty){
     else{
         while (!insert_block)
         {  
-            // choose a block to replace
-            for(e = list_begin(&cache); e!=list_end(&cache); e = list_next(e)){
+            for(e = list_begin(&cache); 
+                e!=list_end(&cache);
+                e = list_next(e)){
                 replace_block = list_entry(e, struct cache_block, elem);
                 if (replace_block->occupied == 0){
-                    /* noone is using this block */
                     if (replace_block->reference_bit == 0){
 
                         if (replace_block->dirty == 1){
                             /*write back to disk if dirty */
-                            block_write(fs_device, replace_block->sector, &replace_block->block_data);
+                            block_write(fs_device, 
+                                        replace_block->sector,
+                                        &replace_block->block_data);
                         }
                         insert_block = replace_block;
                         break;
@@ -128,7 +134,9 @@ scan_cache_write_back(int if_flushed){
     lock_acquire(&cache_lock);
     struct list_elem* e;
     struct cache_block* block;
-    for(e = list_begin(&cache); e!=list_end(&cache); e = list_next(e)){
+    for(e = list_begin(&cache); 
+        e!=list_end(&cache);
+        e = list_next(e)){
         block = list_entry(e, struct cache_block, elem);
         if ((block->dirty == 1) && if_flushed){
             block_write(fs_device, block->sector, &block->block_data);
@@ -138,8 +146,6 @@ scan_cache_write_back(int if_flushed){
     lock_release(&cache_lock);
 }
 
-/* cache write back every "period" time */ 
-/* WARN: period is not right */
 void 
 periodically_cache_write_back(int period UNUSED){
     while (true)
@@ -151,17 +157,25 @@ periodically_cache_write_back(int period UNUSED){
 
 /* reading from sector to buffer */
 void
-cache_block_read (struct block *block, block_sector_t sector, void *buffer)
+cache_block_read (struct block *block,
+                  block_sector_t sector, 
+                  void *buffer)
 {
-    struct cache_block *_cache_block = get_cache_block(sector,0);
-    memcpy(buffer, _cache_block->block_data, BLOCK_SECTOR_SIZE);
+    struct cache_block *_cache_block 
+            = get_cache_block(sector,0);
+    memcpy(buffer, _cache_block->block_data,
+           BLOCK_SECTOR_SIZE);
     release_cache_block(_cache_block);
 }
 
 void
-cache_block_write (struct block *block, block_sector_t sector, const void *buffer)
+cache_block_write (struct block *block,
+                   block_sector_t sector, 
+                   const void *buffer)
 {
-    struct cache_block *_cache_block = get_cache_block(sector,1);
-    memcpy(_cache_block->block_data, buffer, BLOCK_SECTOR_SIZE);
+    struct cache_block *_cache_block =
+                        get_cache_block(sector,1);
+    memcpy(_cache_block->block_data,
+           buffer, BLOCK_SECTOR_SIZE);
     release_cache_block(_cache_block);
 }

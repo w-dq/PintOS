@@ -345,7 +345,6 @@ bitmap_read (struct bitmap *b, struct file *file)
     {
       off_t size = byte_cnt (b->bit_cnt);
       off_t test = file_read_at (file, b->bits, size, 0);
-      printf("[%d][%d][%d][%d]\n",test,size,file->inode->data.length,file->inode->sector);
       success = test == size;
       b->bits[elem_cnt (b->bit_cnt) - 1] &= last_mask (b);
     }

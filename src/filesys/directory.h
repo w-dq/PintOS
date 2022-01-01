@@ -38,9 +38,9 @@ void dir_close (struct dir *);
 struct inode *dir_get_inode (struct dir *);
 
 /* Reading and writing. */
-bool dir_lookup (const struct dir *, const char *name, struct inode **);
-bool dir_add (struct dir *, const char *name, block_sector_t);
-bool dir_remove (struct dir *, const char *name);
-bool dir_readdir (struct dir *, char name[NAME_MAX + 1],int order);
-bool dir_hold_children(struct dir *dir);
+bool dir_lookup (const struct dir *, const char *, struct inode **);
+bool dir_add (struct dir *, const char *, block_sector_t);
+bool dir_remove (struct dir *, const char *);
+bool dir_readdir (struct dir *, char name[NAME_MAX + 1],int);
+bool dir_hold_children(struct dir *);
 #endif /* filesys/directory.h */

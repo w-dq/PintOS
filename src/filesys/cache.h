@@ -30,6 +30,6 @@ void cache_block_write (struct block *, block_sector_t , const void *);
 
 /* scan the whole cache, and write back dirty block to disk. 
 if if_flushed = true, flush the whole cache, i.e. write back dirty + empty the cache */
-void scan_cache_write_back(int if_flushed);
+void scan_cache_write_back(int);
 
 #endif /* filesys/cache.h */

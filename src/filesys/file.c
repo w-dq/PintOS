@@ -61,7 +61,8 @@ file_get_inode (struct file *file)
 off_t
 file_read (struct file *file, void *buffer, off_t size) 
 {
-  off_t bytes_read = inode_read_at (file->inode, buffer, size, file->pos);
+  off_t bytes_read = inode_read_at 
+                    (file->inode, buffer, size, file->pos);
   file->pos += bytes_read;
   return bytes_read;
 }
@@ -91,7 +92,8 @@ file_write (struct file *file, const void *buffer, off_t size)
   if (!is_file){
     return -1;
   }
-  off_t bytes_written = inode_write_at (file->inode, buffer, size, file->pos);
+  off_t bytes_written = inode_write_at 
+                        (file->inode, buffer, size, file->pos);
   file->pos += bytes_written;
   return bytes_written;
 }
@@ -167,23 +169,13 @@ file_tell (struct file *file)
 struct inode *
 file_create (block_sector_t sector, off_t length) 
 {
-  /* init the inode with NULL.*/
   struct inode *inode = NULL;
   if(inode_create (sector, length, 1)){
     inode = inode_open (sector);
     if (inode == NULL)
-      // free_map_release(sector,1);
       free_map_available_at(sector);
 
   }
-
-  // if (inode != NULL && length > 0
-  //     && inode_write_at (inode, "", 1, length - 1) != 1)
-  //   {
-  //     inode_remove (inode);
-  //     inode_close (inode);
-  //     inode = NULL;
-  //   }
   return inode;
 }
 

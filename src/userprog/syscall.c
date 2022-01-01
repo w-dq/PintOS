@@ -20,7 +20,6 @@ syscall_func syscalls[20];
 int max_files = 400;
 
 static void syscall_handler (struct intr_frame *);
-// struct file_node * file_find(struct list *,int);
 void exit_ret(int);
 
 void 
@@ -59,13 +58,14 @@ syscall_init (void)
   syscalls[SYS_INUMBER] = sys_inumber;
 }
 
-/* find file_node representing fd. */ 
+
 struct file_node * 
 file_find(struct list *file_list,int fd)
 {
   struct list_elem *e;
   struct file_node * fn = NULL;
-  for(e = list_begin(file_list); e != list_end(file_list); e = list_next(e)){
+  for(e = list_begin(file_list); e != list_end(file_list);
+      e = list_next(e)){
     fn = list_entry(e,struct file_node,elem);
     if (fn->fd == fd){
       return fn;
@@ -172,14 +172,14 @@ sys_open_file(struct intr_frame *f)
   struct file* open_file = filesys_open(file_name); 
   lock_release(&file_lock);
   if (open_file){
-    /* file node create when open file successfully. */
-    struct file_node* fn = (struct file_node*)malloc(sizeof(struct file_node));
+    struct file_node* fn = 
+                        (struct file_node*)malloc(sizeof(struct file_node));
     if (fn == NULL){
       f->eax = -1;
       return;
     }
     fn->f = open_file;
-    thread_current()->max_fd++;    // next_handle == max_fd
+    thread_current()->max_fd++;    
     fn->fd =  thread_current()->max_fd;
     fn->read_dir_cnt = 0;
     
@@ -297,11 +297,11 @@ sys_close(struct intr_frame *f)
     file_close(openf->f);
     lock_release(&file_lock);
     list_remove(&(openf->elem));
-    free(openf);// used to free struct openf
+    free(openf);
   } 
 }
 
-// proj3
+
 void sys_mmap(struct intr_frame *f UNUSED){
   printf("sys_mmap");
 }
@@ -309,7 +309,7 @@ void sys_munmap(struct intr_frame *f UNUSED){
   printf("sys_munmap");
 }
 
-//proj4
+
 /* Change the current directory. */
 void 
 sys_chdir(struct intr_frame *f){

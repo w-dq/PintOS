@@ -38,7 +38,7 @@ struct inode_disk
     /* indirect */
     block_sector_t indirect[INDIRECT_LENGTH];
     /* doubly_indirect */
-    block_sector_t doubly_indirect;     /* 9 */
+    block_sector_t doubly_indirect;    
     /* indirect is not needed for sake of simplicity */
 
     uint32_t unused[LENGTH_UNUSED];               /* Not used. */
@@ -54,7 +54,6 @@ struct inode
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
 
-    //added
     struct lock extend_lock;
     off_t length_for_read;              /* calculate the file size to read in bytes */
     off_t length;                       /* the file size in bytes */

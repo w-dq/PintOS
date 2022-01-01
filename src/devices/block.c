@@ -78,7 +78,8 @@ block_first (void)
 struct block *
 block_next (struct block *block)
 {
-  return list_elem_to_block (list_next (&block->list_elem));
+  return list_elem_to_block 
+  (list_next (&block->list_elem));
 }
 
 /* Returns the block device with the given NAME, or a null
@@ -88,7 +89,8 @@ block_get_by_name (const char *name)
 {
   struct list_elem *e;
 
-  for (e = list_begin (&all_blocks); e != list_end (&all_blocks);
+  for (e = list_begin (&all_blocks); 
+       e != list_end (&all_blocks);
        e = list_next (e))
     {
       struct block *block = list_entry (e, struct block, list_elem);
@@ -118,7 +120,9 @@ check_sector (struct block *block, block_sector_t sector)
    Internally synchronizes accesses to block devices, so external
    per-block device locking is unneeded. */
 void
-block_read (struct block *block, block_sector_t sector, void *buffer)
+block_read (struct block *block, 
+            block_sector_t sector, 
+            void *buffer)
 {
   check_sector (block, sector);
   block->ops->read (block->aux, sector, buffer);
@@ -131,7 +135,9 @@ block_read (struct block *block, block_sector_t sector, void *buffer)
    Internally synchronizes accesses to block devices, so external
    per-block device locking is unneeded. */
 void
-block_write (struct block *block, block_sector_t sector, const void *buffer)
+block_write (struct block *block, 
+             block_sector_t sector, 
+             const void *buffer)
 {
   check_sector (block, sector);
   ASSERT (block->type != BLOCK_FOREIGN);
