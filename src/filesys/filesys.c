@@ -174,19 +174,10 @@ filesys_chdir (const char* dir){
   struct inode* ind = filepath_get_inode(dir);
   if (ind == NULL) return false;
   struct dir *open_dir = dir_open(ind);
+
   if (open_dir){
     dir_close(thread_current()->cur_dir);
     thread_current()->cur_dir = open_dir;
-    // if (strcmp(dir,"..")==0){
-    //   struct dir_entry e;
-    //   size_t ofs;
-    //   printf("\n====================");
-    //   for (ofs = 0; inode_read_at (open_dir->inode, &e, sizeof e, ofs) == sizeof e;
-    //       ofs += sizeof e) {
-    //     printf("\n[%s]\n",e.name);
-    //   }
-    //   printf("====================\n");
-    // }
     return true;
   }
   else return false;
@@ -214,11 +205,17 @@ filepath_get_inode(const char* filepath){
     char base_name[NAME_MAX + 1];
 
     if(parse_dir(filepath, &dir, base_name)){
-      dir_lookup(dir, base_name, &ind);
-      dir_close(dir);
-      return ind; 
+      if (dir_lookup(dir, base_name, &ind)){
+        dir_close(dir);
+        return ind; 
+      }else{
+        dir_close(dir);
+        return NULL;
+      }
+      
     }
     else return NULL;
+      
   }
 }
 // added

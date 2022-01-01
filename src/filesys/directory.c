@@ -123,18 +123,15 @@ lookup (const struct dir *dir, const char *name,
   // }
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) {
-   // printf("\n[%s]\n",e.name);
     if (e.in_use && !strcmp (name, e.name)) 
       {
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
           *ofsp = ofs;
-        // printf("==true=============\n");
         return true;
       }
   }
-  // printf("==false=============\n");
   return false;
 }
 

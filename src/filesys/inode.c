@@ -234,7 +234,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   if (offset > bytes_to_read){
     return bytes_have_read;
   }
-  
   while (size > 0) 
     {
       /* Disk sector to read, starting byte offset within sector. */
@@ -249,7 +248,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       /* Number of bytes to actually copy out of this sector. */
       int chunk_size = size < min_left ? size : min_left;
       if (chunk_size <= 0) break;
-
       if (block == NULL){
         block = malloc(BLOCK_SECTOR_SIZE);
         if (block == NULL) break;
@@ -263,7 +261,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_have_read += chunk_size;
     }
   free (block);
-
   return bytes_have_read;
 }
 
@@ -330,7 +327,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       bytes_written += chunk_size;
     }
   inode->length_for_read = inode->length;
-
+  free(block);
   return bytes_written;
 }
 
