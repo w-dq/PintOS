@@ -1,11 +1,13 @@
-# PintOS
+# PintOS (CS130-2021)
+
+This is repo for Stanford PintOS project.  
 
 Branches :
 
-Proj1
+Proj1 Thread
 
-Proj2
+Proj2 User Programs
 
-Proj3
+Proj3 Virtual Memory
 
-Proj4
+Proj4 File System
